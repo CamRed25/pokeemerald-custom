@@ -2838,6 +2838,8 @@ bool32 CanThrowLastUsedBall(void)
 {
     if (B_LAST_USED_BALL == FALSE)
         return FALSE;
+    if (!gSaveBlock2Ptr->w_opBallPrompt)
+        return FALSE;
     if (!CanThrowBall())
         return FALSE;
     if (gBattleTypeFlags & (BATTLE_TYPE_TRAINER | BATTLE_TYPE_FRONTIER))
@@ -2851,6 +2853,8 @@ bool32 CanThrowLastUsedBall(void)
 void TryAddLastUsedBallItemSprites(void)
 {
     if (B_LAST_USED_BALL == FALSE)
+        return;
+    if (!gSaveBlock2Ptr->w_opBallPrompt)
         return;
     if (gLastThrownBall == 0
       || (gLastThrownBall != 0 && !CheckBagHasItem(gLastThrownBall, 1)))
