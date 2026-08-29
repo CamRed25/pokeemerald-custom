@@ -373,12 +373,61 @@ static u32 ChooseWildMonIndex_Fishing(u8 rod)
     return wildMonIndex;
 }
 
+// Soft level scaling: gently biases wild encounter levels toward the player's
+// party strength (badges earned + average/lead party level), so wild levels
+// stay relevant without a full difficulty-hack rebalance.
+static u8 GetPartyMonCurvedLevel(void)
+{
+    u8 adjustedLevel, currentLevel, monCount = 0, partyMon, badgeModifier = 0, firstMon = 0;
+    u16 i, totalLevel = 0;
+
+    for (i = FLAG_BADGE01_GET; i < FLAG_BADGE01_GET + NUM_BADGES; i++)
+    {
+        if (FlagGet(i))
+            badgeModifier += 5;
+    }
+    adjustedLevel = badgeModifier;
+
+    for (partyMon = 0; partyMon < PARTY_SIZE; partyMon++)
+    {
+        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][partyMon];
+
+        if (GetMonData(mon, MON_DATA_SPECIES) != SPECIES_NONE
+         && GetMonData(mon, MON_DATA_HP) != 0
+         && !GetMonData(mon, MON_DATA_IS_EGG) && !GetMonData(mon, MON_DATA_SANITY_IS_BAD_EGG))
+        {
+            currentLevel = GetMonData(mon, MON_DATA_LEVEL);
+            totalLevel += currentLevel;
+            monCount++;
+
+            if (monCount == 1)
+                firstMon = currentLevel;
+
+            if (adjustedLevel < currentLevel)
+                adjustedLevel = (adjustedLevel + currentLevel) / 2;
+        }
+    }
+
+    if (monCount == 0)
+        return 0;
+
+    if (adjustedLevel < (totalLevel / monCount))
+        adjustedLevel = (totalLevel + badgeModifier) / monCount;
+
+    if (adjustedLevel > firstMon)
+        adjustedLevel = firstMon;
+
+    return adjustedLevel;
+}
+
 u8 ChooseWildMonLevel(const struct WildPokemon *wildPokemon, u8 wildMonIndex, enum WildPokemonArea area)
 {
     u8 min;
     u8 max;
     u8 range;
     u8 rand;
+    u8 curvedLevel;
+    u8 curveAmount;
 
     if (LURE_STEP_COUNT == 0)
     {
@@ -393,7 +442,19 @@ u8 ChooseWildMonLevel(const struct WildPokemon *wildPokemon, u8 wildMonIndex, en
             min = wildPokemon[wildMonIndex].maxLevel;
             max = wildPokemon[wildMonIndex].minLevel;
         }
+
+        // Soft level scaling: nudge the level range upward toward the
+        // player's curved party level, so low-level encounter tables don't
+        // stay trivial forever.
+        curveAmount = 0;
+        curvedLevel = GetPartyMonCurvedLevel();
+        if (max < curvedLevel)
+            curveAmount = (((2 * curvedLevel) + max) / 3) - max;
+
         range = max - min + 1;
+        if (range < (curveAmount * 3) && curveAmount >= 3)
+            range = curveAmount / 3;
+
         rand = Random() % range;
 
         // check ability for max level mon
@@ -403,13 +464,13 @@ u8 ChooseWildMonLevel(const struct WildPokemon *wildPokemon, u8 wildMonIndex, en
             if (ability == ABILITY_HUSTLE || ability == ABILITY_VITAL_SPIRIT || ability == ABILITY_PRESSURE)
             {
                 if (Random() % 2 == 0)
-                    return max;
+                    return max + curveAmount;
 
                 if (rand != 0)
                     rand--;
             }
         }
-        return min + rand;
+        return min + rand + curveAmount;
     }
     else
     {
