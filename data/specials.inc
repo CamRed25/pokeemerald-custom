@@ -639,3 +639,18 @@ gSpecials::
 	def_special UpdateTrainerCardPhotoIcons
 	def_special StickerManGetBragFlags
 	def_special CheckAddCoins
+
+	def_special OpenQuestMenu, waitstate=1
+	def_special QuestMenu_ScriptUnlockQuest
+	def_special QuestMenu_ScriptSetQuestActive
+	def_special QuestMenu_ScriptSetQuestReward
+	def_special QuestMenu_ScriptCompleteQuest
+	def_special QuestMenu_ScriptCheckUnlocked
+	def_special QuestMenu_ScriptCheckInactive
+	def_special QuestMenu_ScriptCheckActive
+	def_special QuestMenu_ScriptCheckReward
+	def_special QuestMenu_ScriptCheckComplete
+	def_special QuestMenu_ScriptBufferQuestName
+	def_special QuestMenu_ScriptSetSubquestComplete
+	def_special QuestMenu_ScriptCheckSubquestComplete
+	def_special QuestMenu_ScriptBufferSubquestName

@@ -201,6 +201,14 @@ Debug_EventScript_Text_DefensiveIVs:
 	.string "HP IVs: {STR_VAR_1}, DEF IVs: {STR_VAR_2}, SPDEF IVs: {STR_VAR_3}$"
 
 Debug_EventScript_Script_1::
+	setflag FLAG_SYS_QUEST_MENU_GET
+	setvar VAR_0x8004, QUEST_PLACEHOLDER_1
+	special QuestMenu_ScriptUnlockQuest
+	setvar VAR_0x8004, QUEST_PLACEHOLDER_1
+	special QuestMenu_ScriptSetQuestActive
+	setvar VAR_0x8004, QUEST_PLACEHOLDER_2
+	special QuestMenu_ScriptUnlockQuest
+	special OpenQuestMenu
 	release
 	end
 
