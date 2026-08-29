@@ -612,7 +612,8 @@ struct SaveBlock2
              u16 regionMapZoom:1; // whether the map is zoomed in
              u16 w_opMatchCall:1;  // 0=Disabled, 1=Enabled - Match Call
              u16 w_opBallPrompt:1; // 0=Disabled, 1=Enabled - Last Used Ball prompt
-             //u16 padding1:2;
+             u16 w_opCatchMode:1;  // 0=Disabled, 1=Enabled - Catch Mode
+             //u16 padding1:1;
              //u16 padding2;
     /*0x18*/ struct Pokedex pokedex;
     /*0x90*/ u8 filler_90[0x8];

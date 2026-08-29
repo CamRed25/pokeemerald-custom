@@ -399,6 +399,7 @@ void RemoveRuinAbilityFlags(enum BattlerId battler);
 void CheckSetUnburden(enum BattlerId battler);
 bool32 IsDazzlingAbility(enum Ability ability);
 bool32 IsAllowedToUseBag(void);
+bool32 IsCatchModeAvailableInBattle(void);
 bool32 IsAnyTargetTurnDamaged(enum BattlerId battlerAtk, enum SubCheck subCheck);
 bool32 IsAnyTargetAffected(void);
 bool32 IsMimikyuDisguised(enum BattlerId battler);

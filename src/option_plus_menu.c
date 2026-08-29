@@ -34,6 +34,7 @@ enum
     MENUITEM_MAIN_BATTLESTYLE,
     MENUITEM_MAIN_MATCHCALL,
     MENUITEM_MAIN_BALLPROMPT,
+    MENUITEM_MAIN_CATCHMODE,
     MENUITEM_MAIN_CANCEL,
     MENUITEM_MAIN_COUNT,
 };
@@ -174,6 +175,7 @@ static void ReDrawAll(void);
 static void DrawChoices_BattleStyle(int selection, int y);
 static void DrawChoices_MatchCall(int selection, int y);
 static void DrawChoices_BallPrompt(int selection, int y);
+static void DrawChoices_CatchMode(int selection, int y);
 static void DrawChoices_TextSpeed(int selection, int y);
 static void DrawChoices_BattleScene(int selection, int y);
 static void DrawChoices_Sound(int selection, int y);
@@ -213,6 +215,7 @@ struct // MENU_MAIN
     [MENUITEM_MAIN_BATTLESTYLE]     = {DrawChoices_BattleStyle,     ProcessInput_Options_Two},
     [MENUITEM_MAIN_MATCHCALL]       = {DrawChoices_MatchCall,       ProcessInput_Options_Two},
     [MENUITEM_MAIN_BALLPROMPT]      = {DrawChoices_BallPrompt,      ProcessInput_Options_Two},
+    [MENUITEM_MAIN_CATCHMODE]       = {DrawChoices_CatchMode,       ProcessInput_Options_Two},
     [MENUITEM_MAIN_CANCEL]          = {NULL,                        NULL},
 };
 
@@ -235,6 +238,7 @@ struct // MENU_SYSTEM
 static const u8 sText_BattleStyle[]             = _("Battle Style");
 static const u8 sText_MatchCall[]               = _("Match Calls");
 static const u8 sText_BallPrompt[]              = _("Ball Prompt");
+static const u8 sText_CatchMode[]               = _("Catch Mode");
 //System Options
 static const u8 sText_TextSpeed[]               = _("Text Speed");
 static const u8 sText_BattleScene[]             = _("Battle Scene");
@@ -250,6 +254,7 @@ static const u8 *const sOptionMenuItemsNamesMain[MENUITEM_MAIN_COUNT] =
     [MENUITEM_MAIN_BATTLESTYLE]     = sText_BattleStyle,
     [MENUITEM_MAIN_MATCHCALL]       = sText_MatchCall,
     [MENUITEM_MAIN_BALLPROMPT]      = sText_BallPrompt,
+    [MENUITEM_MAIN_CATCHMODE]       = sText_CatchMode,
     [MENUITEM_MAIN_CANCEL]          = gText_OptionMenuSave,
 };
 
@@ -306,6 +311,8 @@ static bool8 CheckConditions(int selection)
             return TRUE;
         case MENUITEM_MAIN_BALLPROMPT:
             return TRUE;
+        case MENUITEM_MAIN_CATCHMODE:
+            return TRUE;
         case MENUITEM_MAIN_CANCEL:
             return TRUE;
         case MENUITEM_MAIN_COUNT:
@@ -326,6 +333,8 @@ static const u8 sText_Desc_MatchCallOn[]       = _("Receive calls for rematches 
 static const u8 sText_Desc_MatchCallOff[]      = _("Disable trainer calls and rematches.");
 static const u8 sText_Desc_BallPromptOn[]      = _("Prompt for the last used Pokéball\nwill appear when able to use.");
 static const u8 sText_Desc_BallPromptOff[]     = _("You will have to open your Bag\nto use a Pokéball.");
+static const u8 sText_Desc_CatchModeOn[]       = _("Attacks against wild Pokémon\ncan't knock them below 1 HP.");
+static const u8 sText_Desc_CatchModeOff[]      = _("Attacks against wild Pokémon\ndeal normal damage.");
 
 static const u8 *const sOptionMenuItemDescriptionsMain[MENUITEM_MAIN_COUNT][3] =
 {
@@ -333,6 +342,7 @@ static const u8 *const sOptionMenuItemDescriptionsMain[MENUITEM_MAIN_COUNT][3] =
     [MENUITEM_MAIN_BATTLESTYLE] = {sText_Desc_BattleStyle_Shift,    sText_Desc_BattleStyle_Set, sText_Empty},
     [MENUITEM_MAIN_MATCHCALL]   = {sText_Desc_MatchCallOn,          sText_Desc_MatchCallOff,    sText_Empty},
     [MENUITEM_MAIN_BALLPROMPT]  = {sText_Desc_BallPromptOn,         sText_Desc_BallPromptOff,   sText_Empty},
+    [MENUITEM_MAIN_CATCHMODE]   = {sText_Desc_CatchModeOff,         sText_Desc_CatchModeOn,     sText_Empty},
     [MENUITEM_MAIN_CANCEL]      = {sText_Desc_Save,                 sText_Empty,                sText_Empty},
 };
 
@@ -364,6 +374,7 @@ static const u8 *const sOptionMenuItemDescriptionsDisabledMain[MENUITEM_MAIN_COU
     [MENUITEM_MAIN_BATTLESTYLE] = sText_Empty,
     [MENUITEM_MAIN_MATCHCALL]   = sText_Empty,
     [MENUITEM_MAIN_BALLPROMPT]  = sText_Empty,
+    [MENUITEM_MAIN_CATCHMODE]   = sText_Empty,
     [MENUITEM_MAIN_CANCEL]      = sText_Empty,
 };
 
@@ -650,6 +661,7 @@ void CB2_InitOptionPlusMenu(void)
             sOptions->sel[MENUITEM_MAIN_BATTLESTYLE]        = gSaveBlock2Ptr->optionsBattleStyle;
             sOptions->sel[MENUITEM_MAIN_MATCHCALL]          = gSaveBlock2Ptr->w_opMatchCall;
             sOptions->sel[MENUITEM_MAIN_BALLPROMPT]         = gSaveBlock2Ptr->w_opBallPrompt;
+            sOptions->sel[MENUITEM_MAIN_CATCHMODE]          = gSaveBlock2Ptr->w_opCatchMode;
 
             sOptions->sel_custom[MENUITEM_SYSTEM_TEXTSPEED]     = gSaveBlock2Ptr->optionsTextSpeed;
             sOptions->sel_custom[MENUITEM_SYSTEM_BATTLESCENE]   = gSaveBlock2Ptr->optionsBattleSceneOff;
@@ -865,6 +877,7 @@ static void Task_OptionMenuSave(u8 taskId)
     gSaveBlock2Ptr->optionsBattleStyle  = sOptions->sel[MENUITEM_MAIN_BATTLESTYLE];
     gSaveBlock2Ptr->w_opMatchCall       = sOptions->sel[MENUITEM_MAIN_MATCHCALL];
     gSaveBlock2Ptr->w_opBallPrompt      = sOptions->sel[MENUITEM_MAIN_BALLPROMPT];
+    gSaveBlock2Ptr->w_opCatchMode       = sOptions->sel[MENUITEM_MAIN_CATCHMODE];
 
     gSaveBlock2Ptr->optionsTextSpeed            = sOptions->sel_custom[MENUITEM_SYSTEM_TEXTSPEED];
     gSaveBlock2Ptr->optionsBattleSceneOff       = sOptions->sel_custom[MENUITEM_SYSTEM_BATTLESCENE];
@@ -1140,6 +1153,18 @@ static void DrawChoices_BallPrompt(int selection, int y)
 
     DrawOptionMenuChoice(sText_BallPromptOff, 104, y, styles[0], active);
     DrawOptionMenuChoice(sText_BallPromptOn, GetStringRightAlignXOffset(1, sText_BallPromptOn, 198), y, styles[1], active);
+}
+
+static const u8 sText_CatchModeOn[] = _("On");
+static const u8 sText_CatchModeOff[] = _("Off");
+static void DrawChoices_CatchMode(int selection, int y)
+{
+    bool8 active = CheckConditions(MENUITEM_MAIN_CATCHMODE);
+    u8 styles[2] = {0};
+    styles[selection] = 1;
+
+    DrawOptionMenuChoice(sText_CatchModeOff, 104, y, styles[0], active);
+    DrawOptionMenuChoice(sText_CatchModeOn, GetStringRightAlignXOffset(1, sText_CatchModeOn, 198), y, styles[1], active);
 }
 
 // System Draw Choices

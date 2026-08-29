@@ -17,8 +17,10 @@
 #include "pokemon.h"
 #include "international_string_util.h"
 #include "item.h"
+#include "item_use.h"
 #include "util.h"
 #include "battle_scripts.h"
+#include "battle_script_commands.h"
 #include "random.h"
 #include "text.h"
 #include "safari_zone.h"
@@ -8020,12 +8022,48 @@ static bool32 IsCriticalHit(struct DamageContext *ctx)
     return isCrit;
 }
 
+// Catch Mode: clamps damage dealt to a wild Pokemon so it can't be knocked below 1 HP,
+// making it easier to catch without risking a one-shot KO.
+bool32 IsCatchModeAvailableInBattle(void)
+{
+    if (gBattleTypeFlags & (BATTLE_TYPE_TRAINER | BATTLE_TYPE_LINK | BATTLE_TYPE_RECORDED_LINK))
+        return FALSE;
+    if (!CanThrowBall())
+        return FALSE;
+    if (!CheckBagHasItem(gBallToDisplay, 1))
+        return FALSE;
+    if (gSaveBlock2Ptr->w_opCatchMode == 0)
+        return FALSE;
+    return TRUE;
+}
+
+static void TryApplyCatchModeDamageClamp(enum BattlerId attacker, enum BattlerId target, s32 *damage)
+{
+    if (!IsCatchModeAvailableInBattle())
+        return;
+    if (!gBattleStruct->catchModeEnabled)
+        return;
+    if (!IsOnPlayerSide(attacker))
+        return;
+    if (target != GetCatchingBattler())
+        return;
+    if (*damage <= 0)
+        return;
+
+    if (gBattleMons[target].hp <= 1)
+        *damage = 0;
+    else if (*damage >= gBattleMons[target].hp)
+        *damage = gBattleMons[target].hp - 1;
+}
+
 s32 GetAdjustedDamage(struct DamageContext *ctx, s32 damage)
 {
     if (DoesSubstituteBlockMove(ctx->battlerAtk, ctx->battlerDef, ctx->move)
      || DoesDisguiseBlockMove(ctx->battlerDef, ctx->move)
      || DoesIceFaceBlockMove(ctx->battlerDef, ctx->move))
         return damage; // No damage will be dealt
+
+    TryApplyCatchModeDamageClamp(ctx->battlerAtk, ctx->battlerDef, &damage);
 
     if (gBattleMons[ctx->battlerDef].hp > damage)
         return damage;
