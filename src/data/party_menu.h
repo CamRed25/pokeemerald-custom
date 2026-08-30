@@ -27,6 +27,30 @@ static const struct BgTemplate sPartyMenuBgTemplates[] =
         .priority = 0,
         .baseTile = 0
     },
+    {
+        .bg = 3,
+        .charBaseIndex = 0,
+        .mapBaseIndex = 27,
+        .screenSize = 0,
+        .paletteMode = 0,
+        .priority = 3,
+        .baseTile = 0
+    },
+};
+
+// SwSh party menu: new background (static art on BG1, scrolling art on BG3) and mon-portrait shadow palette
+static const u32 sPartyMenuBg_Gfx_SwSh[]    = INCGFX_U32("graphics/party_menu/swsh/tiles.png", ".4bpp.smol");
+static const u16 sPartyMenuBg_Pal_SwSh[]    = INCGFX_U16("graphics/party_menu/swsh/tiles.png", ".gbapal");
+static const u32 sPartyMenuBg_Main_Tilemap_SwSh[]   = INCBIN_U32("graphics/party_menu/swsh/bg_main.bin.smolTM");
+static const u32 sPartyMenuBg_Scroll_Tilemap_SwSh[] = INCBIN_U32("graphics/party_menu/swsh/bg_scroll.bin.smolTM");
+static const u16 sMonShadowPalette[] = INCGFX_U16("graphics/party_menu/swsh/shadow.pal", ".gbapal");
+
+#define TAG_MON_SHADOW 55140
+
+static const struct SpritePalette sSpritePal_PartyMonShadow =
+{
+    .data = sMonShadowPalette,
+    .tag = TAG_MON_SHADOW
 };
 
 static const struct PartyMenuBoxInfoRects sPartyBoxInfoRects[] =
