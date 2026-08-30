@@ -57,12 +57,10 @@ enum QuestCases
 	FLAG_GET_COMPLETED,     // check if quest is completed
 	FLAG_GET_FAVORITE,     // check if quest is favorited
 	FLAG_SET_UNLOCKED,      // mark quest as unlocked
-	FLAG_SET_INACTIVE, //mark quest as inactive
 	FLAG_SET_ACTIVE,        // mark quest as active
 	FLAG_SET_REWARD,     // mark quest ready for reward
 	FLAG_SET_COMPLETED,     // mark completed quest
 	FLAG_SET_FAVORITE,     // mark quest as a favorite
-	FLAG_REMOVE_INACTIVE, //remove inactive flag from quest
 	FLAG_REMOVE_ACTIVE, //remove active flag from quest
 	FLAG_REMOVE_REWARD, //remove reward flag from quest
 	FLAG_REMOVE_FAVORITE, //remove favorite flag from quest

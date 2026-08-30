@@ -678,21 +678,15 @@ static void InitItems(void)
 	                           sStateDataPtr->nItems + 1 : 4;
 }
 
-#define try_alloc(ptr__, size) ({ \
-		void ** ptr = (void **)&(ptr__);             \
-		*ptr = Alloc(size);                 \
-		if (*ptr == NULL)                   \
-		{                                   \
-			FreeResources();                  \
-			FadeAndBail();                  \
-			return FALSE;                   \
-		}                                   \
-	})
-
 static bool8 AllocateResourcesForListMenu(void)
 {
-	try_alloc(sListMenuItems,
-	          sizeof(struct ListMenuItem) * CountNumberListRows() + 1);
+	sListMenuItems = Alloc(sizeof(struct ListMenuItem) * CountNumberListRows() + 1);
+	if (sListMenuItems == NULL)
+	{
+		FreeResources();
+		FadeAndBail();
+		return FALSE;
+	}
 	return TRUE;
 }
 
@@ -775,29 +769,13 @@ static void SetScrollPosition(void)
 
 bool8 IfScrollIsOutOfBounds(void)
 {
-	if (sListMenuState.scroll != 0
-	            && sListMenuState.scroll + sStateDataPtr->maxShowed >
-	            sStateDataPtr->nItems + 1)
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return sListMenuState.scroll != 0
+	    && sListMenuState.scroll + sStateDataPtr->maxShowed > sStateDataPtr->nItems + 1;
 }
 
 bool8 IfRowIsOutOfBounds(void)
 {
-	if (sListMenuState.scroll + sListMenuState.row >= sStateDataPtr->nItems +
-	            1)
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return sListMenuState.scroll + sListMenuState.row >= sStateDataPtr->nItems + 1;
 }
 
 static void SaveScrollAndRow(s16 *data)
@@ -881,41 +859,18 @@ u8 IncrementMode(u8 mode)
 
 static bool8 IsSubquestMode(void)
 {
-	if (sStateDataPtr->filterMode > SORT_DONE_AZ)
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return sStateDataPtr->filterMode > SORT_DONE_AZ;
 }
 
 static bool8 IsNotFilteredMode(void)
 {
-	u8 mode = sStateDataPtr->filterMode % 10;
-
-	if (mode == FLAG_GET_UNLOCKED)
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return (sStateDataPtr->filterMode % 10) == FLAG_GET_UNLOCKED;
 }
 
 static bool8 IsAlphaMode(void)
 {
-	if (sStateDataPtr->filterMode < SORT_SUBQUEST
-	            && sStateDataPtr->filterMode > SORT_DONE)
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return sStateDataPtr->filterMode < SORT_SUBQUEST
+	    && sStateDataPtr->filterMode > SORT_DONE;
 }
 
 static u16 BuildMenuTemplate(void)
@@ -983,11 +938,14 @@ static u8 CountNumberListRows()
 	return QUEST_COUNT + 1;
 }
 
+// ponytail: qsort would need <stdlib.h>, which collides with this project's
+// own abs() macro (include/global.h). QUEST_COUNT is tiny, so a plain
+// insertion sort stays simpler than working around that collision.
 u8 *DefineQuestOrder()
 {
 	static u8 sortedList[QUEST_COUNT];
 	u8 a, c, d;
-	u8 placeholderVariable;
+	u8 key;
 
 	for (a = 0; a < QUEST_COUNT; a++)
 	{
@@ -996,18 +954,14 @@ u8 *DefineQuestOrder()
 
 	if (IsAlphaMode())
 	{
-		for (c = 0; c < QUEST_COUNT; c++)
+		for (c = 1; c < QUEST_COUNT; c++)
 		{
-			for (d = c + 1; d < QUEST_COUNT; d++)
+			key = sortedList[c];
+			for (d = c; d > 0 && StringCompare(sSideQuests[sortedList[d - 1]].name, sSideQuests[key].name) > 0; d--)
 			{
-				if (StringCompare(sSideQuests[sortedList[c]].name,
-				                  sSideQuests[sortedList[d]].name) > 0)
-				{
-					placeholderVariable = sortedList[c];
-					sortedList[c] = sortedList[d];
-					sortedList[d] = placeholderVariable;
-				}
+				sortedList[d] = sortedList[d - 1];
 			}
+			sortedList[d] = key;
 		}
 	}
 
@@ -1379,16 +1333,9 @@ u8 PopulateListRowNameAndId(u8 row, u8 countQuest)
 
 static bool8 DoesQuestHaveChildrenAndNotInactive(u16 itemId)
 {
-	if (sSideQuests[itemId].numSubquests != 0
-	            && QuestMenu_GetSetQuestState(itemId, FLAG_GET_UNLOCKED)
-	            && !QuestMenu_GetSetQuestState(itemId, FLAG_GET_INACTIVE))
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return sSideQuests[itemId].numSubquests != 0
+	    && QuestMenu_GetSetQuestState(itemId, FLAG_GET_UNLOCKED)
+	    && !QuestMenu_GetSetQuestState(itemId, FLAG_GET_INACTIVE);
 }
 
 void AddSubQuestButton(u8 countQuest)
@@ -1541,65 +1488,31 @@ void PrintQuestFlavorText(s32 questId)
 	                                      TEXT_SKIP_DRAW, 4);
 }
 
+// QuestMenu_GetSet(Sub)QuestState returns a raw bitmask (not canonical 0/1);
+// callers compare these against TRUE, so normalize with !!.
 bool8 IsSubquestCompletedState(s32 questId)
 {
-	if (QuestMenu_GetSetSubquestState(sStateDataPtr->parentQuest,
-	                                  FLAG_GET_COMPLETED,
-	                                  questId))
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return !!QuestMenu_GetSetSubquestState(sStateDataPtr->parentQuest, FLAG_GET_COMPLETED, questId);
 }
+
 bool8 IsQuestRewardState(s32 questId)
 {
-	if (QuestMenu_GetSetQuestState(questId, FLAG_GET_REWARD))
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return !!QuestMenu_GetSetQuestState(questId, FLAG_GET_REWARD);
 }
 
 bool8 IsQuestInactiveState(s32 questId)
 {
-	if (!QuestMenu_GetSetQuestState(questId, FLAG_GET_ACTIVE))
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return !QuestMenu_GetSetQuestState(questId, FLAG_GET_ACTIVE);
 }
 
 bool8 IsQuestActiveState(s32 questId)
 {
-	if (QuestMenu_GetSetQuestState(questId, FLAG_GET_ACTIVE))
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return !!QuestMenu_GetSetQuestState(questId, FLAG_GET_ACTIVE);
 }
 
 bool8 IsQuestCompletedState(s32 questId)
 {
-	if (QuestMenu_GetSetQuestState(questId, FLAG_GET_COMPLETED))
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return !!QuestMenu_GetSetQuestState(questId, FLAG_GET_COMPLETED);
 }
 
 void DetermineSpriteType(s32 questId)
@@ -2051,14 +1964,7 @@ void ToggleFavoriteAndCleanUp(u8 taskId, u8 selectedQuestId)
 }
 bool8 CheckSelectedIsCancel(u8 selectedQuestId)
 {
-	if (selectedQuestId == (0xFF - 1))
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return selectedQuestId == (0xFF - 1);
 }
 void ReturnFromSubquestAndCleanUp(u8 taskId)
 {
@@ -2186,26 +2092,20 @@ static void FadeAndBail(void)
 }
 
 
-#define try_free(ptr) ({        \
-		void ** ptr__ = (void **)&(ptr);   \
-		if (*ptr__ != NULL)                \
-			Free(*ptr__);                  \
-	})
-
 static void FreeResources(void)
 {
 	int i;
 
-	try_free(sStateDataPtr);
-	try_free(sBg1TilemapBuffer);
-	try_free(sListMenuItems);
+	FREE_AND_SET_NULL(sStateDataPtr);
+	FREE_AND_SET_NULL(sBg1TilemapBuffer);
+	FREE_AND_SET_NULL(sListMenuItems);
 
 	for (i = QUEST_ARRAY_COUNT; i > -1; i--)
 	{
-		try_free(questNameArray[i]);
+		FREE_AND_SET_NULL(questNameArray[i]);
 	}
 
-	try_free(questNameArray);
+	FREE_AND_SET_NULL(questNameArray);
 	FreeAllWindowBuffers();
 }
 
