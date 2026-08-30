@@ -655,3 +655,4 @@ gSpecials::
 	def_special QuestMenu_ScriptCheckSubquestComplete
 	def_special QuestMenu_ScriptBufferSubquestName
 	def_special Debug_RegisterKeyItems
+	def_special Debug_RegisterItemShortcuts

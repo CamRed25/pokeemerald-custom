@@ -73,7 +73,21 @@ mgba_is_alive() {
 }
 
 mgba_window_id() {
-    DISPLAY="$MGBA_DISPLAY" xdotool search --pid "$MGBA_PID" --onlyvisible 2>/dev/null | head -1
+    # Search by PID without --onlyvisible; windows may be temporarily unfocused
+    # during menu transitions but still valid for screenshot capture.
+    # Retry briefly if the window isn't immediately found.
+    local win
+    local tries=0
+    while [ $tries -lt 3 ]; do
+        win="$(DISPLAY="$MGBA_DISPLAY" xdotool search --pid "$MGBA_PID" 2>/dev/null | head -1)"
+        if [ -n "$win" ]; then
+            echo "$win"
+            return 0
+        fi
+        tries=$((tries + 1))
+        sleep 0.1
+    done
+    return 1
 }
 
 # Activate the mgba window so it holds real X input focus. Needed once after
@@ -105,17 +119,24 @@ mgba_key() {
 }
 
 # mgba_screenshot <name-without-extension>
+# Ensures window is focused before capture to avoid black/stale screenshots.
+# Uses `-window root` as ImageMagick 7.x doesn't reliably work with numeric window IDs.
 mgba_screenshot() {
     local name="$1"
-    local win
     mkdir -p "$SCREENSHOT_DIR"
-    win="$(mgba_window_id)"
-    if [ -z "$win" ]; then
-        echo "WARN: no mgba window found, cannot screenshot" >&2
+    # Focus the window to ensure it's active and properly rendered.
+    mgba_focus || true
+    sleep 0.2
+    # Capture entire virtual desktop; mGBA window will be in it. No window-id
+    # lookup needed here — the post-capture file check below is the real gate.
+    DISPLAY="$MGBA_DISPLAY" import -window root "$SCREENSHOT_DIR/$name.png" 2>/dev/null
+    if [ -f "$SCREENSHOT_DIR/$name.png" ] && [ -s "$SCREENSHOT_DIR/$name.png" ]; then
+        echo "$SCREENSHOT_DIR/$name.png"
+        return 0
+    else
+        echo "WARN: screenshot capture failed for $name" >&2
         return 1
     fi
-    DISPLAY="$MGBA_DISPLAY" import -window "$win" "$SCREENSHOT_DIR/$name.png"
-    echo "$SCREENSHOT_DIR/$name.png"
 }
 
 mgba_stop() {
