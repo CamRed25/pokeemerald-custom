@@ -1,7 +1,7 @@
 ---
 name: migration-worker
 description: Sonnet implementation worker for one well-scoped migration unit from `next.md`. Reuse target architecture, keep the diff minimal, build it, and hand runtime testing off. Escalate instead of grinding.
-tools: Read, Edit, Write, Glob, Grep, Bash, Skill
+tools: Read, Edit, Write, Glob, Grep, Bash, Skill, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__find_declaration, mcp__serena__find_implementations, mcp__serena__get_symbols_overview, mcp__serena__get_diagnostics_for_file, mcp__serena__insert_after_symbol, mcp__serena__insert_before_symbol, mcp__serena__replace_symbol_body, mcp__serena__rename_symbol, mcp__serena__safe_delete_symbol, mcp__serena__replace_content, mcp__serena__replace_in_files
 model: sonnet
 effort: medium
 maxTurns: 36
@@ -44,6 +44,13 @@ existing target APIs where practical. Strip donor-specific story/NPC/content
 when the objective is a reusable system.
 
 # SEARCH / READ DISCIPLINE
+
+Prefer Serena's symbol tools (`find_symbol`, `find_referencing_symbols`,
+`get_symbols_overview`) over `Grep` for C symbol navigation and edits
+(`replace_symbol_body`, `insert_after_symbol`/`insert_before_symbol`,
+`rename_symbol`) — they resolve against the actual clangd symbol graph
+instead of text matching. Fall back to `Grep`/`Edit` for anything Serena
+doesn't resolve cleanly (macros, generated data tables, non-C files).
 
 Search symbols before opening large files; read only relevant regions;
 don't inspect unrelated matches once the integration seam is known; don't
