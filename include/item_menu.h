@@ -106,6 +106,7 @@ void CB2_ReturnToBagMenuPocket(void);
 void CB2_BagMenuFromStartMenu(void);
 u8 GetItemListPosition(u8 pocketId);
 bool8 UseRegisteredKeyItemOnField(void);
+void Debug_RegisterKeyItems(void); // registers the two key items Debug_EventScript_Script_2 gives, for testing the Key Item Wheel without Bag navigation
 void CB2_GoToSellMenu(void);
 void GoToBagMenu(u8 location, u8 pocket, MainCallback exitCallback);
 void DoWallyTutorialBagMenu(void);

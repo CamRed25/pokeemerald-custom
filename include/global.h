@@ -1223,6 +1223,7 @@ struct SaveBlock1
     u8 rivalName[PLAYER_NAME_LENGTH + 1];
     struct DaycareMon route5DayCareMon;
 #endif
+    u16 registeredItems[MAX_REGISTERED_ITEMS]; // Key Item Wheel slots (SELECT button quick-access); registeredItem above mirrors the active slot
     // sizeof: 0x3???
 };
 

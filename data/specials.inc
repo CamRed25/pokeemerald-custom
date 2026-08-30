@@ -654,3 +654,4 @@ gSpecials::
 	def_special QuestMenu_ScriptSetSubquestComplete
 	def_special QuestMenu_ScriptCheckSubquestComplete
 	def_special QuestMenu_ScriptBufferSubquestName
+	def_special Debug_RegisterKeyItems

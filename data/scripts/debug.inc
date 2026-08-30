@@ -213,8 +213,15 @@ Debug_EventScript_Script_1::
 	end
 
 Debug_EventScript_Script_2::
+	additem ITEM_BICYCLE
+	additem ITEM_ACRO_BIKE
+	special Debug_RegisterKeyItems
+	msgbox Debug_KeyItemsRegistered, MSGBOX_DEFAULT
 	release
 	end
+
+Debug_KeyItemsRegistered:
+	.string "2 key items registered to SELECT wheel!$"
 
 Debug_EventScript_Script_3::
 	release

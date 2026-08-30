@@ -29,7 +29,36 @@ next up
   `SESSION_STATUS.md` for a note on an unreproduced, unconfirmed "crashed to desktop"
   report from the user's manual testing (possibly Options-Plus-menu-related, possibly
   unrelated) — not resolved, revisit if it recurs.
-- Objectives 10, 11, 13, 14, 15b — triaged 2026-08-28 (see "Objective 10-15 triage" below
+- Objective 10 (Key Item Wheel) — DONE, checkpointed 2026-08-30 (branch `Key-wheel`, merged
+  into `custom`). Adapted from `zanderb27/emerald-plus`'s `Task_KeyItemWheel()`, but SaveBlock1
+  storage diverged from the donor: appended `registeredItems[MAX_REGISTERED_ITEMS]` as new
+  fields instead of the donor's approach of shrinking `MAX_REMATCH_ENTRIES` 100→92 to reclaim
+  space, matching this project's own additive-SaveBlock convention from Quest Menu (no offset
+  shifts to existing fields). `registeredItem` (singular) is kept in sync as a mirror of the
+  active slot for existing single-item call sites. Direct code review (not just build-clean)
+  caught a real bug before checkpointing: migration-worker had moved `item_menu.c`'s
+  `tUsingRegisteredKeyItem` task-data macro from `data[3]` to `data[9]` to make room for the
+  wheel's own sprite-slot data, but that macro's actual use-site is a *different* task (the
+  one `GetItemFieldFunc()` creates, not the wheel task itself) and `item_use.c`'s own copy of
+  the same macro still read `data[3]` — the write and read had silently gone out of sync. Fixed
+  by reverting `item_menu.c`'s definition back to `data[3]` (the wheel's own state/sprite data
+  never shares a task instance with it, so no real collision exists). Ponytail-reviewed clean,
+  nothing to cut. Runtime: two automated `mgba-tester` attempts couldn't reliably navigate the
+  Bag to register 2 key items under Xvfb/xdotool timing within budget (same class of tooling
+  limitation as Catch Mode's wild-battle trigger) — added `Debug_RegisterKeyItems` (new special,
+  `src/item_menu.c`/`include/item_menu.h`/`data/specials.inc`) wired to
+  `Debug_EventScript_Script_2` so the debug menu can reach the 2-items-registered state
+  directly, then used it for a direct mGBA check: SELECT with 2 items registered shows the
+  4-position wheel with correct box placement and item icons in the right slots (up=Bicycle,
+  right=Acro Bike, empty boxes for the unused slots), D-pad-Up correctly selects the Bicycle
+  and triggers the vanilla "Dad's advice, can't ride here" indoor-terrain message — the exact
+  code path the `tUsingRegisteredKeyItem` fix touches, so this also confirms that fix end to
+  end. B/SELECT-to-close-without-using wasn't separately re-checked after this fix landed but
+  was covered by an earlier partial run; low risk given it's an early-return branch with no
+  interaction with the fixed code. Screenshots:
+  `.claude/tests/mgba/screenshots/verify3_02_select_pressed.png` (wheel open),
+  `verify3_03_after_dpad_up.png` (item used, Dad's advice message).
+- Objectives 11, 13, 14, 15b — triaged 2026-08-28 (see "Objective 10-15 triage" below
   for rankings, donor viability, and complexity findings). Not yet implemented.
 - Objectives 16-17 — optional, lower priority than 9-15, not yet triaged.
 - "New candidate features" (donors 5-11, near the bottom of this file) — NOT triaged, NOT
@@ -150,8 +179,9 @@ In progress:
      test the live USM path; boot smoke test and the existing unbound_start_menu_test.sh
      regression both still pass after the USM change.
    Not yet checkpointed — see "Open bugs / issues" below for what's still blocking.
-10. Key Item Wheel — High priority. Register up to four key items and access them quickly.
-    Donor: zanderb27/emerald-plus (dedicated implementation, documents low palette/resource usage).
+10. Key Item Wheel — DONE, checkpointed 2026-08-30 (branch `Key-wheel`). See Status summary
+    above for details (SaveBlock1 approach, the tUsingRegisteredKeyItem fix, and the
+    outstanding manual runtime-verification item).
 11. Registered-item shortcut menu — High priority. More general than the wheel, useful for
     things besides key items. Donor: ebears/pokeemerald-bear.
 12. Soft level scaling — Medium priority. Useful for exploration/order flexibility without a

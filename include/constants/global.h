@@ -103,6 +103,7 @@ enum Language
 #define APPRENTICE_COUNT 4
 #define APPRENTICE_MAX_QUESTIONS 9
 #define MAX_REMATCH_ENTRIES 100 // only REMATCH_TABLE_ENTRIES (78) are used
+#define MAX_REGISTERED_ITEMS 4 // key item wheel slots, SELECT button quick-access
 #define NUM_CONTEST_WINNERS 13
 #define UNION_ROOM_KB_ROW_COUNT 10
 #define SAVED_TRENDS_COUNT 5
