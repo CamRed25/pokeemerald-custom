@@ -78,6 +78,7 @@ enum {
     ACTION_USE,
     ACTION_TOSS,
     ACTION_REGISTER,
+    ACTION_SHORTCUT,
     ACTION_GIVE,
     ACTION_CANCEL,
     ACTION_BATTLE_USE,
@@ -201,6 +202,7 @@ static void ItemMenu_Toss(u8);
 static void ItemMenu_Register(u8);
 static bool32 IsItemRegistered(u16 item);
 static void Task_KeyItemWheel(u8 taskId);
+static void ItemMenu_ToggleShortcut(u8);
 static void ItemMenu_Give(u8);
 static void ItemMenu_Cancel(u8);
 static void ItemMenu_UseInBattle(u8);
@@ -296,6 +298,7 @@ static const struct MenuAction sItemMenuActions[] = {
     [ACTION_USE]               = {gMenuText_Use,                {ItemMenu_UseOutOfBattle}},
     [ACTION_TOSS]              = {gMenuText_Toss,               {ItemMenu_Toss}},
     [ACTION_REGISTER]          = {gMenuText_Register,           {ItemMenu_Register}},
+    [ACTION_SHORTCUT]          = {COMPOUND_STRING("SHORTCUT"),  {ItemMenu_ToggleShortcut}},
     [ACTION_GIVE]              = {gMenuText_Give,               {ItemMenu_Give}},
     [ACTION_CANCEL]            = {gText_Cancel2,                {ItemMenu_Cancel}},
     [ACTION_BATTLE_USE]        = {gMenuText_Use,                {ItemMenu_UseInBattle}},
@@ -323,7 +326,7 @@ static const u8 sContextMenuItems_ItemsPocket[] = {
 
 static const u8 sContextMenuItems_KeyItemsPocket[] = {
     ACTION_USE,         ACTION_REGISTER,
-    ACTION_DUMMY,       ACTION_CANCEL
+    ACTION_SHORTCUT,    ACTION_CANCEL
 };
 
 static const u8 sContextMenuItems_BallsPocket[] = {
@@ -2089,6 +2092,79 @@ static void ItemMenu_Register(u8 taskId)
     ItemMenu_Cancel(taskId);
 }
 
+// Registered-Item Shortcut Menu (L button quick-access, up to MAX_REGISTERED_ITEM_SHORTCUTS
+// slots). Fully separate from the Key Item Wheel above: own SaveBlock1 array, own UI.
+static const u8 sText_TooManyShortcuts[] = _("Too many items registered\nas shortcuts!");
+
+static bool32 IsItemShortcut(u16 item)
+{
+    u32 i;
+    for (i = 0; i < MAX_REGISTERED_ITEM_SHORTCUTS; i++)
+        if (gSaveBlock1Ptr->registeredItemShortcuts[i] == item)
+            return TRUE;
+    return FALSE;
+}
+
+// Removes item (if present) and compacts the array so there are no holes.
+static void RemoveItemShortcut(u16 item)
+{
+    u32 i, j;
+    for (i = 0; i < MAX_REGISTERED_ITEM_SHORTCUTS; i++)
+    {
+        if (gSaveBlock1Ptr->registeredItemShortcuts[i] == item)
+        {
+            for (j = i; j < MAX_REGISTERED_ITEM_SHORTCUTS - 1; j++)
+                gSaveBlock1Ptr->registeredItemShortcuts[j] = gSaveBlock1Ptr->registeredItemShortcuts[j + 1];
+            gSaveBlock1Ptr->registeredItemShortcuts[MAX_REGISTERED_ITEM_SHORTCUTS - 1] = ITEM_NONE;
+            return;
+        }
+    }
+}
+
+// Debug-menu shortcut (Debug_EventScript_Script_3) to reach a populated state
+// without navigating the Bag by hand, for testing the Registered-Item Shortcut Menu.
+void Debug_RegisterItemShortcuts(void)
+{
+    gSaveBlock1Ptr->registeredItemShortcuts[0] = ITEM_BICYCLE;
+    gSaveBlock1Ptr->registeredItemShortcuts[1] = ITEM_ESCAPE_ROPE;
+}
+
+static void ItemMenu_ToggleShortcut(u8 taskId)
+{
+    s16 *data = gTasks[taskId].data;
+    u16 *scrollPos = &gBagPosition.scrollPosition[gBagPosition.pocket];
+    u16 *cursorPos = &gBagPosition.cursorPosition[gBagPosition.pocket];
+    u32 i;
+
+    if (IsItemShortcut(gSpecialVar_ItemId))
+    {
+        RemoveItemShortcut(gSpecialVar_ItemId);
+    }
+    else
+    {
+        u32 slot = MAX_REGISTERED_ITEM_SHORTCUTS;
+        for (i = 0; i < MAX_REGISTERED_ITEM_SHORTCUTS; i++)
+        {
+            if (gSaveBlock1Ptr->registeredItemShortcuts[i] == ITEM_NONE)
+            {
+                slot = i;
+                break;
+            }
+        }
+        if (slot == MAX_REGISTERED_ITEM_SHORTCUTS)
+        {
+            DisplayItemMessage(taskId, FONT_NORMAL, sText_TooManyShortcuts, HandleErrorMessage);
+            return;
+        }
+        gSaveBlock1Ptr->registeredItemShortcuts[slot] = gSpecialVar_ItemId;
+    }
+    DestroyListMenuTask(tListTaskId, scrollPos, cursorPos);
+    LoadBagItemListBuffers(gBagPosition.pocket);
+    tListTaskId = ListMenuInit(&gMultiuseListMenuTemplate, *scrollPos, *cursorPos);
+    ScheduleBgCopyTilemapToVram(0);
+    ItemMenu_Cancel(taskId);
+}
+
 static void ItemMenu_Give(u8 taskId)
 {
     RemoveContextWindow();
@@ -2425,6 +2501,125 @@ bool8 UseRegisteredKeyItemOnField(void)
 }
 
 #undef tUsingRegisteredKeyItem
+
+// Registered-Item Shortcut Menu screen (L button field overlay). Text-only list
+// (no per-row icons — ListMenu already draws items[].name by default, see
+// ListMenuPrintEntries, so icons would be pure extra sprite/tag bookkeeping
+// for a nice-to-have) modeled on debug.c's Debug_ShowMenu/Debug_DestroyMenu
+// lightweight window+ListMenu overlay pattern.
+static struct ListMenuItem sShortcutMenuItems[MAX_REGISTERED_ITEM_SHORTCUTS];
+static u8 sShortcutMenuItemNames[MAX_REGISTERED_ITEM_SHORTCUTS][ITEM_NAME_LENGTH + 1];
+
+#define tShortcutListTaskId data[0]
+#define tShortcutWindowId   data[1]
+
+static void Task_RegisteredItemShortcutMenu(u8 taskId);
+
+static void DestroyRegisteredItemShortcutMenu(u8 taskId)
+{
+    DestroyListMenuTask(gTasks[taskId].tShortcutListTaskId, NULL, NULL);
+    ClearStdWindowAndFrame(gTasks[taskId].tShortcutWindowId, TRUE);
+    RemoveWindow(gTasks[taskId].tShortcutWindowId);
+    DestroyTask(taskId);
+}
+
+void OpenRegisteredItemShortcutMenu(void)
+{
+    struct ListMenuTemplate menuTemplate = {0};
+    struct WindowTemplate winTemplate = {0};
+    u8 windowId, listTaskId, taskId;
+    u32 i, count = 0;
+
+    for (i = 0; i < MAX_REGISTERED_ITEM_SHORTCUTS; i++)
+    {
+        u16 item = gSaveBlock1Ptr->registeredItemShortcuts[i];
+        if (item == ITEM_NONE)
+            continue;
+        CopyItemName(item, sShortcutMenuItemNames[count]);
+        sShortcutMenuItems[count].name = sShortcutMenuItemNames[count];
+        sShortcutMenuItems[count].id = item;
+        count++;
+    }
+    if (count == 0)
+        return; // nothing registered, silently no-op (mirrors keeping this screen minimal)
+
+    HideMapNamePopUpWindow();
+    LockPlayerFieldControls();
+    FreezeObjectEvents();
+    PlayerFreeze();
+    StopPlayerAvatar();
+
+    winTemplate.bg = 0;
+    winTemplate.tilemapLeft = 1;
+    winTemplate.tilemapTop = 1;
+    winTemplate.width = 15;
+    winTemplate.height = 2 * min(count, 6);
+    winTemplate.paletteNum = 15;
+    winTemplate.baseBlock = 1;
+
+    LoadMessageBoxAndBorderGfx();
+    windowId = AddWindow(&winTemplate);
+    DrawStdWindowFrame(windowId, FALSE);
+
+    menuTemplate.items = sShortcutMenuItems;
+    menuTemplate.moveCursorFunc = ListMenuDefaultCursorMoveFunc;
+    menuTemplate.totalItems = count;
+    menuTemplate.maxShowed = min(count, 6);
+    menuTemplate.windowId = windowId;
+    menuTemplate.item_X = 8;
+    menuTemplate.cursor_X = 0;
+    menuTemplate.upText_Y = 1;
+    menuTemplate.cursorPal = 2;
+    menuTemplate.fillValue = 1;
+    menuTemplate.cursorShadowPal = 3;
+    menuTemplate.lettersSpacing = 1;
+    menuTemplate.fontId = FONT_NORMAL;
+    menuTemplate.scrollMultiple = LIST_NO_MULTIPLE_SCROLL;
+    listTaskId = ListMenuInit(&menuTemplate, 0, 0);
+
+    taskId = CreateTask(Task_RegisteredItemShortcutMenu, 8);
+    gTasks[taskId].tShortcutListTaskId = listTaskId;
+    gTasks[taskId].tShortcutWindowId = windowId;
+
+    CopyWindowToVram(windowId, COPYWIN_FULL);
+}
+
+static void Task_RegisteredItemShortcutMenu(u8 taskId)
+{
+    s32 input = ListMenu_ProcessInput(gTasks[taskId].tShortcutListTaskId);
+
+    if (JOY_NEW(B_BUTTON))
+    {
+        PlaySE(SE_SELECT);
+        DestroyRegisteredItemShortcutMenu(taskId);
+        UnfreezeObjectEvents();
+        UnlockPlayerFieldControls();
+        return;
+    }
+    if (JOY_NEW(A_BUTTON) && input != LIST_NOTHING_CHOSEN && input != LIST_CANCEL)
+    {
+        u16 item = input;
+        PlaySE(SE_SELECT);
+        DestroyRegisteredItemShortcutMenu(taskId);
+        if (CheckBagHasItem(item, 1) != TRUE)
+        {
+            // Stale slot (item no longer in Bag) — drop it and just close, don't dispatch.
+            RemoveItemShortcut(item);
+            UnfreezeObjectEvents();
+            UnlockPlayerFieldControls();
+            return;
+        }
+        LockPlayerFieldControls();
+        FreezeObjectEvents();
+        PlayerFreeze();
+        StopPlayerAvatar();
+        gSpecialVar_ItemId = item;
+        CreateTask(GetItemFieldFunc(item), 8);
+    }
+}
+
+#undef tShortcutListTaskId
+#undef tShortcutWindowId
 
 static void Task_ItemContext_Sell(u8 taskId)
 {

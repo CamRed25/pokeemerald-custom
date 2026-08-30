@@ -224,8 +224,15 @@ Debug_KeyItemsRegistered:
 	.string "2 key items registered to SELECT wheel!$"
 
 Debug_EventScript_Script_3::
+	additem ITEM_BICYCLE
+	additem ITEM_ESCAPE_ROPE
+	special Debug_RegisterItemShortcuts
+	msgbox Debug_ItemShortcutsRegistered, MSGBOX_DEFAULT
 	release
 	end
+
+Debug_ItemShortcutsRegistered:
+	.string "2 items registered to L shortcut menu!$"
 
 Debug_EventScript_Script_4::
 	release

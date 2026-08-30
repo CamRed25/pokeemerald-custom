@@ -183,7 +183,10 @@ In progress:
     above for details (SaveBlock1 approach, the tUsingRegisteredKeyItem fix, and the
     outstanding manual runtime-verification item).
 11. Registered-item shortcut menu — High priority. More general than the wheel, useful for
-    things besides key items. Donor: ebears/pokeemerald-bear.
+    things besides key items. Donor: ebears/pokeemerald-bear. **DONE, checkpointed
+    2026-08-30 — scope narrowed to Key Items pocket only** (deviates from this line's
+    "things besides key items" ambition; see "Objective 11 scope narrowing" below for why
+    and what's left for a future pass).
 12. Soft level scaling — Medium priority. Useful for exploration/order flexibility without a
     full difficulty hack. Donor: ebears/pokeemerald-bear (already demonstrates wild scaling).
 13. Mugshots + dialogue nameplates — Medium priority. Significant presentation improvement for
@@ -285,6 +288,28 @@ order to implement, highest first:
    underlying registered-item storage (in which case slot counts must reconcile) or two
    independent systems. Resolve that design question — ideally after objective 10 lands, so
    there's a concrete SaveBlock1 layout to reconcile against — before implementing this one.
+
+   **Objective 11 scope narrowing (2026-08-30, resolved during implementation):** built as
+   an independent, non-reconciled 10-slot system (separate from the Wheel's 4-slot
+   `registeredItems`), opened with the field L button — see `SESSION_STATUS.md`'s Objective
+   11 section for the full implementation writeup. During runtime verification, registering
+   a party-menu-type item (a Potion) as a shortcut and using it from the field hung on a
+   black screen: the shortcut menu's dispatch (`CreateTask(GetItemFieldFunc(item), 8)`,
+   `src/item_menu.c` around the `ItemMenu_ToggleShortcut`/shortcut-select handler) copies
+   the *existing* Key-Item-Wheel dispatch pattern, which only works for simple
+   `ITEM_USE_FIELD` items (Escape Rope, Repel, Bicycle) — not `ITEM_USE_PARTY_MENU` items
+   like medicine, which need the Bag's own `SetUpItemUseCallback` flow and the task/UI state
+   that only exists inside the Bag's task context. Rather than build out full per-item-type
+   dispatch (effectively re-implementing part of the Bag's item-use routing in this new
+   field-overlay context), scope was narrowed to match what's proven to work: `ACTION_SHORTCUT`
+   stays wired into `sContextMenuItems_KeyItemsPocket[]` only (not the Items/Balls/TMs/Berries
+   pockets), so only key-item-style `ITEM_USE_FIELD` items can be registered as shortcuts
+   through the real UI. This means this line's "more general than the wheel, useful for
+   things besides key items" ambition is **not implemented** — a real gap versus the
+   original ask, not just a documentation note. Left for a future objective if wanted:
+   extend `ACTION_SHORTCUT` to other pockets and teach the shortcut-menu dispatch to route
+   `ITEM_USE_PARTY_MENU` (and other non-field) item types through their correct use flow
+   instead of the bare `CreateTask` call.
 5. **Objective 15b (Improved move-info panel) — 55%.** Same donor as 15a
    (worpbane/pokeemerald-worped-ex), confirmed present (`TryToAddMoveInfoWindow()` etc.,
    src/battle_interface.c:2992-3120+). Independent of Catch Mode (no shared state, just

@@ -1224,6 +1224,7 @@ struct SaveBlock1
     struct DaycareMon route5DayCareMon;
 #endif
     u16 registeredItems[MAX_REGISTERED_ITEMS]; // Key Item Wheel slots (SELECT button quick-access); registeredItem above mirrors the active slot
+    u16 registeredItemShortcuts[MAX_REGISTERED_ITEM_SHORTCUTS]; // Registered-Item Shortcut Menu slots (L button quick-access), independent of the Key Item Wheel above
     // sizeof: 0x3???
 };
 

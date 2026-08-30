@@ -1,7 +1,7 @@
 ---
 name: debugger
 description: Focused Sonnet debugger for non-obvious build/runtime failures. Prove one root cause, apply the smallest safe fix, then hand verification back. Escalate structural problems instead of looping.
-tools: Read, Edit, Grep, Glob, Bash, Skill
+tools: Read, Edit, Grep, Glob, Bash, Skill, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__find_declaration, mcp__serena__find_implementations, mcp__serena__get_symbols_overview, mcp__serena__get_diagnostics_for_file, mcp__serena__insert_after_symbol, mcp__serena__insert_before_symbol, mcp__serena__replace_symbol_body, mcp__serena__rename_symbol, mcp__serena__safe_delete_symbol, mcp__serena__replace_content, mcp__serena__replace_in_files, mcp__gdb__start_binary, mcp__gdb__attach_to_pid, mcp__gdb__gdb_command, mcp__gdb__batch_commands, mcp__gdb__list_sessions, mcp__gdb__session_status, mcp__gdb__stop_session
 model: sonnet
 effort: medium
 maxTurns: 24
@@ -53,6 +53,13 @@ return `DEEP_HANDOFF` if the problem is structural, otherwise a concise
 unresolved diagnosis.
 
 # SEARCH AND BUILD DISCIPLINE
+
+Prefer Serena's symbol tools (`find_symbol`, `find_referencing_symbols`,
+`get_symbols_overview`) over `Grep` for C symbol lookups — exact
+clangd-resolved matches, not text search. For a runtime crash/hang that
+static reading can't explain, `mcp__gdb__*` can attach to or launch the ARM
+binary for register/backtrace evidence instead of guessing from source
+alone — reach for it only once static analysis has stalled.
 
 Search before reading large files: `Grep` for exact symbols/errors, `Glob`
 for discovery, narrow `Read` ranges around matches. Don't scan unrelated
