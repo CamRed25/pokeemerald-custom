@@ -66,6 +66,15 @@ at the end of a pipeline. Prefer a focused rebuild that reliably tests the
 fix; run broader only to prove integration, and don't repeat full builds if
 a narrower check can disprove the hypothesis.
 
+Pipe rebuild output through a filter (e.g. `make ... 2>&1 | grep -iE
+"error|undefined reference"`) rather than reading the raw log into context —
+a failed attempt should cost tokens proportional to the actual error, not
+the whole compiler/linker transcript. Exception: if the filtered output
+doesn't actually explain the failure (the real cause needs surrounding
+context a simple pattern can't isolate, or you suspect the filter dropped
+something load-bearing), rerun and read the full unfiltered output — don't
+stay stuck re-filtering blind.
+
 # RUNTIME FAILURES
 
 Treat `mgba-tester` evidence as authoritative observation, not a conclusion

@@ -84,8 +84,8 @@ Using the current objective from `next.md`:
     * unintended donor code
     * unrelated changes
     * dependency problems
-12. Create a checkpoint commit on the feature's dedicated branch only after the unit is verified.
-13. Never push automatically.
+12. Follow the commit → merge → next-branch cycle in **Progression** below, only
+    once the unit is verified.
 
 ## Safety constraints
 
@@ -118,14 +118,51 @@ Using the current objective from `next.md`:
 After completing an item from `next.md`:
 
 1. Verify it.
-2. If not already on a dedicated feature branch for this objective, create one (`feature/<name>`)
-   before committing.
-3. Commit the known-good state on that feature branch, staging only the files scoped to this objective.
-4. Re-read `next.md`.
-5. Determine the next unfinished objective from that file.
-6. Continue according to its stated order and constraints.
+2. Run `ponytail:ponytail-review` over the objective's own diff (since it branched
+   off `custom`) and apply the simplifications it finds. This is a required step
+   for every objective before checkpointing, not an occasional cleanup pass —
+   optimize the newly written code, don't just review it.
+3. If not already on a dedicated feature branch for this objective, create one
+   (`feature/<name>`) before committing.
+4. Commit the known-good, ponytailed state on that feature branch, staging only
+   the files scoped to this objective.
+5. Merge that feature branch into `custom`.
+6. Re-read `next.md` and determine the next unfinished objective from that file.
+7. Branch a new feature branch off the now-updated `custom` for that next
+   objective, and continue there according to its stated order and constraints.
 
-Do not assume the objective from a previous run is still current. Always consult `next.md`.
+This loop (verify → ponytail → commit → merge to `custom` → branch the next
+objective → repeat) runs continuously without stopping to ask permission between
+objectives, unless blocked — see "When stuck" below.
+
+## When stuck
+
+Keep the loop moving rather than stalling indefinitely on one objective.
+
+**Stuck on a bug**, once `debugger` has already tried and failed to root-cause it:
+
+1. Remove the affected file and reimplement that piece a genuinely different way
+   — not a repeat of the same fix.
+2. If the reimplementation still doesn't resolve it, fall back to the smallest
+   patch that makes the build succeed and leaves existing game behavior
+   unaffected (stub out or disable just the broken piece). Never leave the tree
+   in a state that fails to build, and never ship a "fix" that breaks something
+   that worked before.
+3. Either way, note the unresolved bug in `next.md` (same pattern as the existing
+   Catch Mode "unreproduced crash" note) — what it is, what was tried, and why it
+   didn't work — so it isn't silently lost.
+
+**Stuck on a design question** (a genuinely-could-go-either-way choice, not a
+correctness question):
+
+1. Don't stall gathering more evidence, and don't escalate purely for a decision.
+2. Make a reasonable medium/middle-of-the-road choice — favor whichever option is
+   cheapest to revise if it turns out to be the wrong one — and implement it.
+3. Note the decision and the open question in `next.md` for later reconsideration.
+
+This doesn't relax the existing escalation paths (`debugger` for bugs,
+`deep-engineer` for real architectural ambiguity) — it's what happens after
+those have already been tried and the loop is still stuck.
 
 ## Project subagents
 
@@ -173,12 +210,19 @@ the handoff text is an incomplete task, not a completed one:
   audit of a migration unit before checkpointing: runs `ponytail:ponytail-audit`
   once, filters to the current objective/diff, and drafts a `REVIEW_HANDOFF`.
   Does not make the final accept/reject call — see the handoff rule above.
-- **deep-engineer** (Opus) — architecture, major subsystem redesigns,
-  difficult cross-cutting changes, ambiguous root-cause debugging (after
-  Sonnet has made multiple unsuccessful attempts), and planning major new
-  functionality. Uses `mattpocock-skills:codebase-design` when architectural
-  analysis is needed and `superpowers:writing-plans` to structure its plans.
-  Not for routine implementation, searching, documentation, or mechanical
-  editing. The sole architecture/escalation agent in this roster — prefers
-  to return an implementation plan for `migration-worker` to execute rather
-  than doing all the implementation itself.
+- **deep-engineer** (Opus) — architecture and ambiguous root-cause escalation:
+  difficult cross-cutting bugs after Sonnet has made multiple unsuccessful
+  attempts, and genuine architectural decisions. Uses
+  `mattpocock-skills:codebase-design` when architectural analysis is needed
+  and `superpowers:writing-plans` to structure its plans. Not for routine
+  implementation, searching, documentation, mechanical editing, or planning
+  a large addition/overhaul from scratch — that's `overhaul-planner`.
+  Prefers to return an implementation plan for `migration-worker` to execute
+  rather than doing all the implementation itself.
+- **overhaul-planner** (Opus, read-only, `Read` tool only) — plans a large
+  addition or overhaul of an existing system: given target/donor file paths
+  from the caller, returns a phased implementation plan for
+  `migration-worker`. Does not search the repo itself (no Glob/Grep/Bash) —
+  the caller supplies exact paths, keeping this, the most expensive agent in
+  the roster, cheap to run. Not for bug root-causing (`deep-engineer`) or
+  routine feature ports (`migration-worker`).

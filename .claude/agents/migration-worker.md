@@ -65,14 +65,18 @@ replacement systems.
 
 # BUILD LOOP
 
-Build after a meaningful integrated unit, not every tiny edit. For
+Build after a meaningful integrated unit, not every tiny edit. Pipe rebuild
+output through a filter (e.g. `make ... 2>&1 | grep -iE "error|undefined
+reference"`) rather than reading the raw log — a failed attempt should cost
+tokens proportional to the actual error, not the whole transcript. For
 straightforward adaptation errors (missing target equivalent, renamed
 type/function, an include/declaration mismatch, an obvious donor
 assumption), make at most two focused repair attempts. If the cause isn't
 clear after a reasonable look, stop and return `DEBUG_HANDOFF` with the
 exact build command, real exit code, first/root-looking errors, files
-changed, and what was already tried. Don't grind through ambiguous
-failures.
+changed, and what was already tried — `debugger` can pull the full
+unfiltered transcript itself if the filtered evidence isn't enough; don't
+grind through ambiguous failures trying to get there yourself.
 
 # ARCHITECTURE ESCALATION
 
