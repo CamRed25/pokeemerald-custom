@@ -253,6 +253,14 @@ struct NPCFollower
 #include "constants/items.h"
 #define ITEM_FLAGS_COUNT ((ITEMS_COUNT / 8) + ((ITEMS_COUNT % 8) ? 1 : 0))
 
+#include "constants/unbound_start_menu.h"
+#include "constants/quests.h"
+
+struct PACKED Usm_SavedItems {
+    u8 items[USM_ICO_COUNT];
+    u8 count;
+};
+
 struct SaveBlock3
 {
 #if OW_USE_FAKE_RTC
@@ -271,6 +279,7 @@ struct SaveBlock3
 #if APRICORN_TREE_COUNT > 0
     u8 apricornTrees[NUM_APRICORN_TREE_BYTES];
 #endif
+    struct Usm_SavedItems usmSaved;
 }; /* max size 1624 bytes */
 
 extern struct SaveBlock3 *gSaveBlock3Ptr;
@@ -601,7 +610,10 @@ struct SaveBlock2
              u16 optionsBattleStyle:1; // OPTIONS_BATTLE_STYLE_[SHIFT/SET]
              u16 optionsBattleSceneOff:1; // whether battle animations are disabled
              u16 regionMapZoom:1; // whether the map is zoomed in
-             //u16 padding1:4;
+             u16 w_opMatchCall:1;  // 0=Disabled, 1=Enabled - Match Call
+             u16 w_opBallPrompt:1; // 0=Disabled, 1=Enabled - Last Used Ball prompt
+             u16 w_opCatchMode:1;  // 0=Disabled, 1=Enabled - Catch Mode
+             //u16 padding1:1;
              //u16 padding2;
     /*0x18*/ struct Pokedex pokedex;
     /*0x90*/ u8 filler_90[0x8];
@@ -622,7 +634,9 @@ struct SaveBlock2
 #endif //FREE_RECORD_MIXING_HALL_RECORDS
     /*0x624*/ u16 contestLinkResults[CONTEST_CATEGORIES_COUNT][CONTESTANT_COUNT];
     /*0x64C*/ struct BattleFrontier frontier;
-}; // sizeof=0xF2C
+    u8 questData[DIV_ROUND_UP(QUEST_COUNT, 8) * QUEST_STATES];
+    u8 subQuests[DIV_ROUND_UP(SUB_QUEST_COUNT, 8)];
+}; // sizeof=0xF34 (was 0xF2C before the additive questData/subQuests fields)
 
 extern struct SaveBlock2 *gSaveBlock2Ptr;
 
