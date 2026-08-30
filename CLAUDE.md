@@ -63,6 +63,22 @@ When practical, use Opus to determine the solution and return routine implementa
 
 Do not use Opus merely because a task contains many files.
 
+## Concurrency
+
+Default to one subagent working at a time: dispatch it, wait for its result,
+then dispatch the next. Do not fan out multiple `Agent` calls in the same
+turn as the default behavior.
+
+Two subagents running concurrently is the ceiling, never more, and only
+when the work is genuinely independent — no shared files, no dependency
+between the two tasks — and running them serially would meaningfully slow
+the loop down. This is the exception, not the default; most tasks should
+stay at one.
+
+Do not use the `Workflow` tool for this project's migration work — it fans
+out beyond this cap by design. Use individual `Agent`/subagent calls per
+the roster below instead.
+
 ## Execution
 
 Using the current objective from `next.md`:
