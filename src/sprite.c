@@ -1749,6 +1749,14 @@ bool8 AddSpriteToOamBuffer(struct Sprite *sprite, u8 *oamIndex)
     {
         gMain.oamBuffer[*oamIndex] = sprite->oam;
         (*oamIndex)++;
+        if (sprite->copyToObjWin)
+        {
+            if (*oamIndex >= gOamLimit)
+                return TRUE;
+            gMain.oamBuffer[*oamIndex] = sprite->oam;
+            gMain.oamBuffer[*oamIndex].objMode = ST_OAM_OBJ_WINDOW;
+            (*oamIndex)++;
+        }
         return FALSE;
     }
     else
@@ -1772,6 +1780,14 @@ bool8 AddSubspritesToOamBuffer(struct Sprite *sprite, struct OamData *destOam, u
     {
         *destOam = *oam;
         (*oamIndex)++;
+        if (sprite->copyToObjWin)
+        {
+            if (*oamIndex >= gOamLimit)
+                return TRUE;
+            destOam[1] = *oam;
+            destOam[1].objMode = ST_OAM_OBJ_WINDOW;
+            (*oamIndex)++;
+        }
         return FALSE;
     }
     else

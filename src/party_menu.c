@@ -212,6 +212,10 @@ EWRAM_DATA struct PartyMenu gPartyMenu = {0};
 static EWRAM_DATA struct PartyMenuBox *sPartyMenuBoxes = NULL;
 static EWRAM_DATA u8 *sPartyBgGfxTilemap = NULL;
 static EWRAM_DATA u8 *sPartyBgTilemapBuffer = NULL;
+static EWRAM_DATA u8 *sPartyBg3TilemapBuffer = NULL;
+static EWRAM_DATA u8 sMonSpriteId = 0;
+static EWRAM_DATA u8 sMonShadowSpriteId = 0;
+static EWRAM_DATA u16 sMonAnimTimer = 0;
 EWRAM_DATA bool8 gPartyMenuUseExitCallback = 0;
 EWRAM_DATA u8 gSelectedMonPartyId = 0;
 EWRAM_DATA MainCallback gPostMenuFieldCallback = NULL;
@@ -246,6 +250,12 @@ static void CreateCancelConfirmPokeballSprites(void);
 static void CreateCancelConfirmWindows(u8);
 static void Task_ExitPartyMenu(u8);
 static void FreePartyPointers(void);
+static u8 CreateMonSprite(struct Pokemon *, bool32);
+static u8 LoadMonGfxAndSprite(struct Pokemon *, s16 *, bool32);
+static void DestroyMonSprite(void);
+static void SpriteCB_PartyMonPokemon(struct Sprite *);
+static void RunMonAnimTimer(void);
+static void UpdatePartyMonSprite(u8);
 static void PartyPaletteBufferCopy(u8);
 static void DisplayPartyPokemonDataForMultiBattle(u8);
 static void LoadPartyBoxPalette(struct PartyMenuBox *, u8);
@@ -610,6 +620,10 @@ static void VBlankCB_PartyMenu(void)
     LoadOam();
     ProcessSpriteCopyRequests();
     TransferPlttBuffer();
+    ChangeBgX(3, 64, BG_COORD_ADD);
+    ChangeBgY(3, 64, BG_COORD_ADD);
+    if (sMonSpriteId != 0 && sMonSpriteId != MAX_SPRITES)
+        RunMonAnimTimer();
 }
 
 static void CB2_InitPartyMenu(void)
@@ -730,19 +744,52 @@ static bool8 ShowPartyMenu(void)
         gMain.state++;
         break;
     case 19:
+        sPartyMenuInternal->data[0] = 0;
         gMain.state++;
         break;
     case 20:
+        if (gPartyMenu.menuType != PARTY_MENU_TYPE_IN_BATTLE
+            && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_SHOWCASE
+            && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_FULL_SHOWCASE
+            && gPartyMenu.slotId < gPartiesCount[B_TRAINER_PLAYER]
+            && GetMonData(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], MON_DATA_SPECIES) != SPECIES_NONE)
+        {
+            sMonShadowSpriteId = LoadMonGfxAndSprite(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], &sPartyMenuInternal->data[0], TRUE);
+            if (sMonShadowSpriteId != 0xFF)
+                gMain.state++;
+        }
+        else
+            gMain.state++;
+        break;
+    case 21:
+        sPartyMenuInternal->data[0] = 0;
+        gMain.state++;
+        break;
+    case 22:
+        if (gPartyMenu.menuType != PARTY_MENU_TYPE_IN_BATTLE
+            && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_SHOWCASE
+            && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_FULL_SHOWCASE
+            && gPartyMenu.slotId < gPartiesCount[B_TRAINER_PLAYER]
+            && GetMonData(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], MON_DATA_SPECIES) != SPECIES_NONE)
+        {
+            sMonSpriteId = LoadMonGfxAndSprite(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], &sPartyMenuInternal->data[0], FALSE);
+            if (sMonSpriteId != 0xFF)
+                gMain.state++;
+        }
+        else
+            gMain.state++;
+        break;
+    case 23:
         CreateTask(sPartyMenuInternal->task, 0);
         DisplayPartyMenuStdMessage(sPartyMenuInternal->messageId);
         gMain.state++;
         break;
-    case 21:
+    case 24:
         BlendPalettes(PALETTES_ALL, 16, 0);
         gPaletteFade.bufferTransferDisabled = FALSE;
         gMain.state++;
         break;
-    case 22:
+    case 25:
         BeginNormalPaletteFade(PALETTES_ALL, 0, 16, 0, RGB_BLACK);
         gMain.state++;
         break;
@@ -836,11 +883,43 @@ static bool8 ReloadPartyMenu(void)
         gMain.state++;
         break;
     case 17:
+        if (gPartyMenu.menuType != PARTY_MENU_TYPE_IN_BATTLE
+            && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_SHOWCASE
+            && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_FULL_SHOWCASE
+            && gPartyMenu.slotId < gPartiesCount[B_TRAINER_PLAYER]
+            && GetMonData(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], MON_DATA_SPECIES) != SPECIES_NONE)
+        {
+            sMonShadowSpriteId = LoadMonGfxAndSprite(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], &sPartyMenuInternal->data[0], TRUE);
+            if (sMonShadowSpriteId != 0xFF)
+                gMain.state++;
+        }
+        else
+            gMain.state++;
+        break;
+    case 18:
+        sPartyMenuInternal->data[0] = 0;
+        gMain.state++;
+        break;
+    case 19:
+        if (gPartyMenu.menuType != PARTY_MENU_TYPE_IN_BATTLE
+            && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_SHOWCASE
+            && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_FULL_SHOWCASE
+            && gPartyMenu.slotId < gPartiesCount[B_TRAINER_PLAYER]
+            && GetMonData(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], MON_DATA_SPECIES) != SPECIES_NONE)
+        {
+            sMonSpriteId = LoadMonGfxAndSprite(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], &sPartyMenuInternal->data[0], FALSE);
+            if (sMonSpriteId != 0xFF)
+                gMain.state++;
+        }
+        else
+            gMain.state++;
+        break;
+    case 20:
         BlendPalettes(PALETTES_ALL, 16, RGB_WHITEALPHA);
         gPaletteFade.bufferTransferDisabled = FALSE;
         gMain.state++;
         break;
-    case 18:
+    case 21:
         BeginNormalPaletteFade(PALETTES_ALL, 0, 16, 0, RGB_WHITEALPHA);
         gMain.state++;
         break;
@@ -874,8 +953,13 @@ static void ResetPartyMenu(void)
 {
     sPartyMenuInternal = NULL;
     sPartyBgTilemapBuffer = NULL;
+    sPartyBg3TilemapBuffer = NULL;
     sPartyMenuBoxes = NULL;
     sPartyBgGfxTilemap = NULL;
+    sMonSpriteId = MAX_SPRITES;
+    sMonShadowSpriteId = MAX_SPRITES;
+    StopShadowAnimDelayTask();
+    sMonAnimTimer = 0;
 }
 
 static bool8 AllocPartyMenuBg(void)
@@ -884,17 +968,26 @@ static bool8 AllocPartyMenuBg(void)
     if (sPartyBgTilemapBuffer == NULL)
         return FALSE;
 
+    sPartyBg3TilemapBuffer = Alloc(0x800);
+    if (sPartyBg3TilemapBuffer == NULL)
+        return FALSE;
+
     memset(sPartyBgTilemapBuffer, 0, 0x800);
+    memset(sPartyBg3TilemapBuffer, 0, 0x800);
     ResetBgsAndClearDma3BusyFlags(0);
     InitBgsFromTemplates(0, sPartyMenuBgTemplates, ARRAY_COUNT(sPartyMenuBgTemplates));
     SetBgTilemapBuffer(1, sPartyBgTilemapBuffer);
+    SetBgTilemapBuffer(3, sPartyBg3TilemapBuffer);
     ResetAllBgsCoordinates();
     ScheduleBgCopyTilemapToVram(1);
+    ScheduleBgCopyTilemapToVram(3);
     SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_OBJ_ON | DISPCNT_OBJ_1D_MAP);
-    SetGpuReg(REG_OFFSET_BLDCNT, 0);
+    SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT2_BG3 | BLDCNT_TGT2_BG1 | BLDCNT_EFFECT_BLEND);
+    SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(14, 6));
     ShowBg(0);
     ShowBg(1);
     ShowBg(2);
+    ShowBg(3);
     return TRUE;
 }
 
@@ -905,39 +998,44 @@ static bool8 AllocPartyMenuBgGfx(void)
     switch (sPartyMenuInternal->data[0])
     {
     case 0:
-        sPartyBgGfxTilemap = malloc_and_decompress(gPartyMenuBg_Gfx, &sizeout);
+        sPartyBgGfxTilemap = malloc_and_decompress(sPartyMenuBg_Gfx_SwSh, &sizeout);
         LoadBgTiles(1, sPartyBgGfxTilemap, sizeout, 0);
         sPartyMenuInternal->data[0]++;
         break;
     case 1:
         if (!IsDma3ManagerBusyWithBgCopy())
         {
-            DecompressDataWithHeaderWram(gPartyMenuBg_Tilemap, sPartyBgTilemapBuffer);
+            DecompressDataWithHeaderWram(sPartyMenuBg_Main_Tilemap_SwSh, sPartyBgTilemapBuffer);
             sPartyMenuInternal->data[0]++;
         }
         break;
     case 2:
-        LoadPalette(gPartyMenuBg_Pal, BG_PLTT_ID(0), 11 * PLTT_SIZE_4BPP);
-        CpuCopy16(gPlttBufferUnfaded, sPartyMenuInternal->palBuffer, 11 * PLTT_SIZE_4BPP);
+        DecompressDataWithHeaderWram(sPartyMenuBg_Scroll_Tilemap_SwSh, sPartyBg3TilemapBuffer);
+        ScheduleBgCopyTilemapToVram(3);
         sPartyMenuInternal->data[0]++;
         break;
     case 3:
-        PartyPaletteBufferCopy(4);
+        LoadPalette(sPartyMenuBg_Pal_SwSh, BG_PLTT_ID(0), 7 * PLTT_SIZE_4BPP);
+        CpuCopy16(gPlttBufferUnfaded, sPartyMenuInternal->palBuffer, 7 * PLTT_SIZE_4BPP);
         sPartyMenuInternal->data[0]++;
         break;
     case 4:
-        PartyPaletteBufferCopy(5);
+        PartyPaletteBufferCopy(4);
         sPartyMenuInternal->data[0]++;
         break;
     case 5:
-        PartyPaletteBufferCopy(6);
+        PartyPaletteBufferCopy(5);
         sPartyMenuInternal->data[0]++;
         break;
     case 6:
-        PartyPaletteBufferCopy(7);
+        PartyPaletteBufferCopy(6);
         sPartyMenuInternal->data[0]++;
         break;
     case 7:
+        PartyPaletteBufferCopy(7);
+        sPartyMenuInternal->data[0]++;
+        break;
+    case 8:
         PartyPaletteBufferCopy(8);
         sPartyMenuInternal->data[0]++;
         break;
@@ -954,12 +1052,180 @@ static void PartyPaletteBufferCopy(u8 palNum)
     CpuCopy16(&gPlttBufferUnfaded[BG_PLTT_ID(3)], &gPlttBufferFaded[offset], PLTT_SIZE_4BPP);
 }
 
+// SwSh party menu: large animated "mon portrait" sprite shown alongside the party list
+#define sSpecies    data[0]
+#define sDontFlip   data[1]
+#define sDelayAnim  data[2]
+#define sIsShadow   data[3]
+#define sIsEgg      data[4] // for passing into onFrame in PokemonSummaryDoMonAnimation
+
+static u8 CreateMonSprite(struct Pokemon *mon, bool32 isShadow)
+{
+    u16 species = GetMonData(mon, MON_DATA_SPECIES_OR_EGG);
+    u8 shadowPalette = 0;
+    u8 spriteId = CreateSprite(&gMultiuseSpriteTemplate, 184, 74, 5);
+
+    if (spriteId != MAX_SPRITES)
+    {
+        FreeSpriteOamMatrix(&gSprites[spriteId]);
+        gSprites[spriteId].sSpecies = species;
+        gSprites[spriteId].sDelayAnim = 0;
+        gSprites[spriteId].sIsShadow = isShadow;
+        gSprites[spriteId].sIsEgg = GetMonData(mon, MON_DATA_IS_EGG);
+        gSprites[spriteId].oam.priority = 1;
+        if (isShadow)
+            gSprites[spriteId].subpriority = 7;
+        else
+            gSprites[spriteId].subpriority = 6;
+        gSprites[spriteId].callback = SpriteCB_PartyMonPokemon;
+        if (isShadow)
+        {
+            FreeSpritePaletteByTag(TAG_MON_SHADOW);
+            shadowPalette = LoadSpritePalette(&sSpritePal_PartyMonShadow);
+            gSprites[spriteId].oam.paletteNum = shadowPalette;
+            gSprites[spriteId].oam.objMode = ST_OAM_OBJ_BLEND;
+            gSprites[spriteId].x += 5;
+            gSprites[spriteId].y += 2;
+        }
+    }
+
+    return spriteId;
+}
+
+static u8 LoadMonGfxAndSprite(struct Pokemon *mon, s16 *state, bool32 isShadow)
+{
+    u16 species = GetMonData(mon, MON_DATA_SPECIES_OR_EGG);
+    u32 pid = GetMonData(mon, MON_DATA_PERSONALITY);
+    bool8 isShiny = GetMonData(mon, MON_DATA_IS_SHINY);
+
+    switch (*state)
+    {
+    default:
+        return CreateMonSprite(mon, isShadow);
+    case 0:
+        if (gMonSpritesGfxPtr != NULL)
+            HandleLoadSpecialPokePic(TRUE, gMonSpritesGfxPtr->spritesGfx[B_POSITION_OPPONENT_LEFT], species, pid);
+        else
+            HandleLoadSpecialPokePic(TRUE, MonSpritesGfxManager_GetSpritePtr(MON_SPR_GFX_MANAGER_A, B_POSITION_OPPONENT_LEFT), species, pid);
+        (*state)++;
+        return 0xFF;
+    case 1:
+        LoadSpritePaletteWithTag(GetMonSpritePalFromSpeciesAndPersonality(species, isShiny, pid), species);
+        SetMultiuseSpriteTemplateToPokemon(species, B_POSITION_OPPONENT_LEFT);
+        (*state)++;
+        return 0xFF;
+    }
+}
+
+static void DestroyMonSprite(void)
+{
+    if (sMonSpriteId != 0 && sMonSpriteId != MAX_SPRITES)
+    {
+        StopPokemonAnimationDelayTask();
+        DestroySpriteAndFreeResources(&gSprites[sMonSpriteId]);
+        sMonSpriteId = MAX_SPRITES;
+    }
+    if (sMonShadowSpriteId != 0 && sMonShadowSpriteId != MAX_SPRITES)
+    {
+        StopShadowAnimDelayTask();
+        DestroySpriteAndFreeResources(&gSprites[sMonShadowSpriteId]);
+        sMonShadowSpriteId = MAX_SPRITES;
+    }
+}
+
+static void SpriteCB_PartyMonPokemon(struct Sprite *sprite)
+{
+    if (!gPaletteFade.active && sprite->sDelayAnim != 1)
+    {
+        sprite->sDontFlip = TRUE;
+        PokemonSummaryDoMonAnimation(sprite, sprite->sSpecies, sprite->sIsEgg, sprite->sIsShadow);
+    }
+}
+
+static void RunMonAnimTimer(void)
+{
+    u32 i;
+
+    if (sMonSpriteId != SPRITE_NONE && gSprites[sMonSpriteId].callback == SpriteCallbackDummy) // mon anim is finished
+    {
+        // Sanitize OAM bits to prevent the shared animation engine's flipping bug
+        gSprites[sMonSpriteId].oam.matrixNum = (gSprites[sMonSpriteId].hFlip << 3) | (gSprites[sMonSpriteId].vFlip << 4);
+        if (sMonShadowSpriteId != SPRITE_NONE)
+            gSprites[sMonShadowSpriteId].oam.matrixNum = (gSprites[sMonShadowSpriteId].hFlip << 3) | (gSprites[sMonShadowSpriteId].vFlip << 4);
+
+        if (SWSH_PARTY_MON_IDLE_ANIMS)
+            sMonAnimTimer++;
+    }
+
+    if (SWSH_PARTY_MON_IDLE_ANIMS && sMonAnimTimer > SWSH_PARTY_MON_IDLE_ANIMS_FRAMES && sMonSpriteId != SPRITE_NONE) // time to re-run the anim
+    {
+        for (i = 1; i < 8; i++)
+        {
+            gSprites[sMonSpriteId].data[i] = 0;
+            if (sMonShadowSpriteId != SPRITE_NONE)
+                gSprites[sMonShadowSpriteId].data[i] = 0;
+        }
+
+        gSprites[sMonSpriteId].sSpecies = GetMonData(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], MON_DATA_SPECIES_OR_EGG);
+        gSprites[sMonSpriteId].sIsShadow = FALSE;
+        gSprites[sMonSpriteId].sIsEgg = GetMonData(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], MON_DATA_IS_EGG);
+
+        if (sMonShadowSpriteId != SPRITE_NONE)
+        {
+            gSprites[sMonShadowSpriteId].sSpecies = GetMonData(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], MON_DATA_SPECIES_OR_EGG);
+            gSprites[sMonShadowSpriteId].sIsShadow = TRUE;
+            gSprites[sMonShadowSpriteId].sIsEgg = GetMonData(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], MON_DATA_IS_EGG);
+        }
+
+        gSprites[sMonSpriteId].callback = SpriteCB_PartyMonPokemon;
+        if (sMonShadowSpriteId != SPRITE_NONE)
+            gSprites[sMonShadowSpriteId].callback = SpriteCB_PartyMonPokemon;
+
+        sMonAnimTimer = 0;
+    }
+}
+
+static void UpdatePartyMonSprite(u8 slotId)
+{
+    s16 state;
+    u8 spriteId;
+
+    if (gPartyMenu.menuType != PARTY_MENU_TYPE_IN_BATTLE
+        && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_SHOWCASE
+        && gPartyMenu.menuType != PARTY_MENU_TYPE_MULTI_FULL_SHOWCASE
+        && slotId < gPartiesCount[B_TRAINER_PLAYER]
+        && GetMonData(&gParties[B_TRAINER_PLAYER][slotId], MON_DATA_SPECIES) != SPECIES_NONE)
+    {
+        DestroyMonSprite();
+        state = 0;
+        do
+        {
+            spriteId = LoadMonGfxAndSprite(&gParties[B_TRAINER_PLAYER][slotId], &state, TRUE);
+        } while (spriteId == 0xFF);
+        sMonShadowSpriteId = spriteId;
+
+        state = 0;
+        do
+        {
+            spriteId = LoadMonGfxAndSprite(&gParties[B_TRAINER_PLAYER][slotId], &state, FALSE);
+        } while (spriteId == 0xFF);
+        sMonSpriteId = spriteId;
+    }
+    else
+    {
+        DestroyMonSprite();
+    }
+}
+
 static void FreePartyPointers(void)
 {
+    DestroyMonSprite();
     if (sPartyMenuInternal)
         Free(sPartyMenuInternal);
     if (sPartyBgTilemapBuffer)
         Free(sPartyBgTilemapBuffer);
+    if (sPartyBg3TilemapBuffer)
+        Free(sPartyBg3TilemapBuffer);
     if (sPartyBgGfxTilemap)
         Free(sPartyBgGfxTilemap);
     if (sPartyMenuBoxes)
@@ -1827,6 +2093,7 @@ static void UpdateCurrentPartySelection(s8 *slotPtr, s8 movementDir)
         PlaySE(SE_SELECT);
         AnimatePartySlot(newSlotId, 0);
         AnimatePartySlot(*slotPtr, 1);
+        UpdatePartyMonSprite(*slotPtr);
     }
 }
 
@@ -6724,6 +6991,36 @@ void ItemUseCB_Fusion(u8 taskId, TaskFunc taskFunc)
 #undef moveToLearn
 #undef forgetMove
 #undef storageIndex
+
+static const u8 sText_MonBallWasChanged[] = _("{STR_VAR_1} was put in the {STR_VAR_2}.{PAUSE_UNTIL_PRESS}");
+
+void ItemUseCB_PokeBall(u8 taskId, TaskFunc task)
+{
+    struct Pokemon *mon = &gPlayerParty[gPartyMenu.slotId];
+    u16 currBall = GetMonData(mon, MON_DATA_POKEBALL);
+    u16 newBall = gSpecialVar_ItemId;
+
+    if (currBall == newBall)
+    {
+        gPartyMenuUseExitCallback = FALSE;
+        DisplayPartyMenuMessage(gText_WontHaveEffect, TRUE);
+        ScheduleBgCopyTilemapToVram(2);
+        gTasks[taskId].func = task;
+    }
+    else
+    {
+        GetMonNickname(mon, gStringVar1);
+        CopyItemName(newBall, gStringVar2);
+        PlaySE(SE_SELECT);
+        gPartyMenuUseExitCallback = TRUE;
+        SetMonData(mon, MON_DATA_POKEBALL, &newBall);
+        StringExpandPlaceholders(gStringVar4, sText_MonBallWasChanged);
+        DisplayPartyMenuMessage(gStringVar4, TRUE);
+        ScheduleBgCopyTilemapToVram(2);
+        gTasks[taskId].func = task;
+        RemoveBagItem(newBall, 1);
+    }
+}
 
 static void SpriteCB_FormChangeIconMosaic(struct Sprite *sprite)
 {
