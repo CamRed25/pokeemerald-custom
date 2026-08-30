@@ -1,16 +1,2 @@
 {
-  "hooks": {
-    "TeammateIdle": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "input=$(cat); agent=$(echo \"$input\" | jq -r '(.agent_type // .teammate_type // .agent // .name // \"\") | ascii_downcase' 2>/dev/null); task=$(echo \"$input\" | jq -r '(.task // .current_task // .description // .status // \"\")' 2>/dev/null); if echo \"$agent\" | grep -qE 'migration-worker|debugger|independent-reviewer' && ! echo \"$task\" | grep -qiE 'build|make check|make$'; then ctx=$(claude -p \"Read next.md for the current migration objective. This project's teammate '$agent' just went idle mid-task (task context: $task). Act as the Explore agent: run a TARGETED, read-only search (grep/glob/read only, no edits) for donor implementation, target implementation, key symbols, existing target APIs, or assets that are likely still needed to finish this task. Return 5-15 concise, high-value findings with file:line references, oriented toward unblocking implementation. Do not write or edit any files.\" 2>/dev/null); jq -n --arg ctx \"$ctx\" '{hookSpecificOutput:{hookEventName:\"TeammateIdle\",additionalContext:$ctx}}' 2>/dev/null || echo '{}'; else echo '{}'; fi",
-            "timeout": 180,
-            "statusMessage": "Idle teammate on a code fix/review — checking for missing info via Explore..."
-          }
-        ]
-      }
-    ]
-  }
 }
