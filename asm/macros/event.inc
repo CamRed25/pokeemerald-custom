@@ -2855,6 +2855,17 @@
 	.4byte \name
 	.endm
 
+	@ Creates a field dialogue portrait. Arguments may be constants or variables.
+	.macro createfieldmugshot id:req, emote=EMOTE_NORMAL
+	callnative CreateFieldMugshot
+	.2byte \id
+	.2byte \emote
+	.endm
+
+	.macro removefieldmugshot
+	callnative RemoveFieldMugshot
+	.endm
+
 	@ Gives a random berry between the index ranges
 	.macro giverandomberry loBerry:req, hiBerry:req
 	.if \loBerry == 0 || \loBerry > NUM_BERRIES
