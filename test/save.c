@@ -67,12 +67,17 @@ TEST("Manual save writes land in the fixed manual physical group")
     ClearSaveData();
     Save_ResetSaveCounters();
     gSaveBlock2Ptr->saveFormatMarker = SAVE_FORMAT_MARKER; // already-migrated
+    gSaveBlock2Ptr->playerTrainerId[0] = 1;
+    gSaveBlock2Ptr->playerTrainerId[1] = 2;
+    gSaveBlock2Ptr->playerTrainerId[2] = 3;
+    gSaveBlock2Ptr->playerTrainerId[3] = 4;
 
     TrySavingData(SAVE_NORMAL);
 
     u32 counter;
     EXPECT_EQ(GetSaveGroupStatus(SAVE_GROUP_MANUAL, gRamSaveSectorLocations, &counter), SAVE_STATUS_OK);
     EXPECT_EQ(GetSaveGroupStatus(SAVE_GROUP_AUTOSAVE, gRamSaveSectorLocations, &counter), SAVE_STATUS_EMPTY);
+    EXPECT_EQ(GetSaveBlocksPointersBaseOffset(), 10);
 }
 
 // Together, this test and the one above prove group isolation for each
