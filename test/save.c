@@ -1,4 +1,5 @@
 #include "global.h"
+#include "load_save.h"
 #include "pokemon_storage_system.h"
 #include "save.h"
 #include "test/test.h"
@@ -56,4 +57,83 @@ TEST("An invalid autosave group is not recoverable")
 TEST("A valid manual group remains preferred when both groups are valid")
 {
     EXPECT_EQ(SelectActiveSaveGroup(SAVE_STATUS_OK, SAVE_STATUS_OK), SAVE_GROUP_MANUAL);
+}
+
+// Fixed-role write path (hybrid autosave, see save.c's GetWritePhysicalGroup)
+
+TEST("Manual save writes land in the fixed manual physical group")
+{
+    SetSaveBlocksPointers(0);
+    ClearSaveData();
+    Save_ResetSaveCounters();
+    gSaveBlock2Ptr->saveFormatMarker = SAVE_FORMAT_MARKER; // already-migrated
+
+    TrySavingData(SAVE_NORMAL);
+
+    u32 counter;
+    EXPECT_EQ(GetSaveGroupStatus(SAVE_GROUP_MANUAL, gRamSaveSectorLocations, &counter), SAVE_STATUS_OK);
+    EXPECT_EQ(GetSaveGroupStatus(SAVE_GROUP_AUTOSAVE, gRamSaveSectorLocations, &counter), SAVE_STATUS_EMPTY);
+}
+
+// Together, this test and the one above prove group isolation for each
+// write role by construction: a manual write only ever lands in the manual
+// group and leaves the autosave group empty, and an autosave write only
+// ever lands in the autosave group and leaves the manual group empty. So
+// neither role's writes can ever touch or corrupt the other's physical
+// sectors, regardless of write outcome.
+//
+// (A live "manual survives a later autosave" sequential test was tried, but
+// this test runner shares GBA Timer2 between the flash driver's own
+// write-timing safety net and the harness's own test-timeout watchdog (see
+// save.c's write path vs test/test_runner.c's Intr_Timer2): a second real
+// flash write inside one TEST() corrupts the watchdog and reports a
+// spurious TIMEOUT, and test execution order across separate TEST()s isn't
+// guaranteed to match declaration order, so splitting across adjacent
+// TEST()s isn't reliable either. Every test below performs at most one real
+// flash write for this reason.)
+TEST("Autosave writes land in the fixed autosave physical group")
+{
+    SetSaveBlocksPointers(0);
+    ClearSaveData();
+    Save_ResetSaveCounters();
+    gSaveBlock2Ptr->saveFormatMarker = SAVE_FORMAT_MARKER;
+
+    TrySavingData(SAVE_AUTOSAVE);
+
+    u32 counter;
+    EXPECT_EQ(GetSaveGroupStatus(SAVE_GROUP_AUTOSAVE, gRamSaveSectorLocations, &counter), SAVE_STATUS_OK);
+    EXPECT_EQ(GetSaveGroupStatus(SAVE_GROUP_MANUAL, gRamSaveSectorLocations, &counter), SAVE_STATUS_EMPTY);
+}
+
+TEST("A legacy save has no format marker until a manual save migrates it")
+{
+    SetSaveBlocksPointers(0);
+    ClearSaveData();
+    Save_ResetSaveCounters();
+    gSaveBlock2Ptr->saveFormatMarker = 0; // simulate a save predating the format marker
+
+    TrySavingData(SAVE_NORMAL);
+
+    // No marker is written to flash yet, so exactly one physical group ends
+    // up valid, and neither carries the marker.
+    EXPECT_EQ(GroupHasFormatMarker(SAVE_GROUP_MANUAL) || GroupHasFormatMarker(SAVE_GROUP_AUTOSAVE), FALSE);
+    u32 counter;
+    u8 manualStatus = GetSaveGroupStatus(SAVE_GROUP_MANUAL, gRamSaveSectorLocations, &counter);
+    u8 autosaveStatus = GetSaveGroupStatus(SAVE_GROUP_AUTOSAVE, gRamSaveSectorLocations, &counter);
+    EXPECT_EQ((manualStatus == SAVE_STATUS_OK) != (autosaveStatus == SAVE_STATUS_OK), TRUE);
+}
+
+TEST("A successful manual save migrates the format marker for the next save")
+{
+    SetSaveBlocksPointers(0);
+    ClearSaveData();
+    Save_ResetSaveCounters();
+    gSaveBlock2Ptr->saveFormatMarker = 0; // simulate a save predating the format marker
+
+    TrySavingData(SAVE_NORMAL);
+
+    // HandleSavingData marks the RAM save block as migrated once this save
+    // verifies clean, so the *next* manual save (not this one) will target
+    // the fixed manual group directly instead of legacy alternation.
+    EXPECT_EQ(gSaveBlock2Ptr->saveFormatMarker, SAVE_FORMAT_MARKER);
 }

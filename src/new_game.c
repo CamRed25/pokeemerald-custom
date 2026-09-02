@@ -173,6 +173,9 @@ void NewGameInitData(void)
 #endif
     gDifferentSaveFile = TRUE;
     gSaveBlock2Ptr->encryptionKey = 0;
+    // New games start already on the fixed-role hybrid autosave format, with
+    // no valid autosave snapshot yet (see save.h's SAVE_FORMAT_MARKER).
+    gSaveBlock2Ptr->saveFormatMarker = SAVE_FORMAT_MARKER;
     ZeroPlayerPartyMons();
     ZeroEnemyPartyMons();
     ResetPokedex();

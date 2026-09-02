@@ -94,6 +94,18 @@ COMMON_DATA MainCallback gGameContinueCallback = NULL;
 COMMON_DATA struct SaveSectorLocation gRamSaveSectorLocations[NUM_SECTORS_PER_SLOT] = {0};
 COMMON_DATA u16 gSaveAttemptStatus = 0;
 
+// Physical group (SAVE_GROUP_MANUAL/SAVE_GROUP_AUTOSAVE) targeted by the write
+// operation currently in progress. Only consulted once the save has migrated
+// to the fixed-role format (see GetWritePhysicalGroup); set by each write
+// entry point (HandleSavingData, LinkFullSave_Init, WriteSaveBlock2) before
+// any sectors are written.
+static u8 sSaveWriteRole = SAVE_GROUP_MANUAL;
+
+// Physical group selected by the most recent GetSaveValidStatus scan, i.e.
+// whichever group holds the save data that should actually be loaded. Used by
+// the sector-read side (CopySaveSlotData, GetSaveBlocksPointersBaseOffset).
+static u8 sSaveReadGroup = SAVE_GROUP_MANUAL;
+
 EWRAM_DATA struct SaveSector gSaveDataBuffer = {0}; // Buffer used for reading/writing sectors
 
 void ClearSaveData(void)
@@ -174,6 +186,19 @@ static u8 WriteSaveSectorOrSlot(u16 sectorId, const struct SaveSectorLocation *l
     return status;
 }
 
+// Returns which physical group (0 or 1) the write in progress should target.
+// Once the active save has migrated to the fixed-role format (SaveBlock2's
+// saveFormatMarker is set), this is simply the role of the current write
+// (sSaveWriteRole: manual or autosave). Until then it falls back to the
+// original alternating-slot behavior, unchanged, so legacy saves keep
+// rotating exactly as before until a manual save actually migrates them.
+static u8 GetWritePhysicalGroup(void)
+{
+    if (gSaveBlock2Ptr->saveFormatMarker == SAVE_FORMAT_MARKER)
+        return sSaveWriteRole;
+    return gSaveCounter % NUM_SAVE_SLOTS;
+}
+
 static u8 HandleWriteSector(u16 sectorId, const struct SaveSectorLocation *locations)
 {
     u16 i;
@@ -184,7 +209,7 @@ static u8 HandleWriteSector(u16 sectorId, const struct SaveSectorLocation *locat
     // Adjust sector id for current save slot
     sector = sectorId + gLastWrittenSector;
     sector %= NUM_SECTORS_PER_SLOT;
-    sector += NUM_SECTORS_PER_SLOT * (gSaveCounter % NUM_SAVE_SLOTS);
+    sector += NUM_SECTORS_PER_SLOT * GetWritePhysicalGroup();
 
     // Get current save data
     data = locations[sectorId].data;
@@ -320,7 +345,7 @@ static u8 HandleReplaceSector(u16 sectorId, const struct SaveSectorLocation *loc
     // Adjust sector id for current save slot
     sector = sectorId + gLastWrittenSector;
     sector %= NUM_SECTORS_PER_SLOT;
-    sector += NUM_SECTORS_PER_SLOT * (gSaveCounter % NUM_SAVE_SLOTS);
+    sector += NUM_SECTORS_PER_SLOT * GetWritePhysicalGroup();
 
     // Get current save data
     data = locations[sectorId].data;
@@ -401,7 +426,7 @@ static u8 WriteSectorSignatureByte_NoOffset(u16 sectorId, const struct SaveSecto
     // This first line lacking -1 is the only difference from WriteSectorSignatureByte
     u16 sector = sectorId + gLastWrittenSector;
     sector %= NUM_SECTORS_PER_SLOT;
-    sector += NUM_SECTORS_PER_SLOT * (gSaveCounter % NUM_SAVE_SLOTS);
+    sector += NUM_SECTORS_PER_SLOT * GetWritePhysicalGroup();
 
     // Write just the first byte of the signature field, which was skipped by HandleReplaceSector
     if (ProgramFlashByte(sector, SECTOR_SIGNATURE_OFFSET, SECTOR_SIGNATURE & 0xFF))
@@ -425,7 +450,7 @@ static u8 CopySectorSignatureByte(u16 sectorId, const struct SaveSectorLocation 
     // Adjust sector id for current save slot
     u16 sector = sectorId + gLastWrittenSector - 1;
     sector %= NUM_SECTORS_PER_SLOT;
-    sector += NUM_SECTORS_PER_SLOT * (gSaveCounter % NUM_SAVE_SLOTS);
+    sector += NUM_SECTORS_PER_SLOT * GetWritePhysicalGroup();
 
     // Copy just the first byte of the signature field from the read/write buffer
     if (ProgramFlashByte(sector, SECTOR_SIGNATURE_OFFSET, ((u8 *)gReadWriteSector)[SECTOR_SIGNATURE_OFFSET]))
@@ -449,7 +474,7 @@ static u8 WriteSectorSignatureByte(u16 sectorId, const struct SaveSectorLocation
     // Adjust sector id for current save slot
     u16 sector = sectorId + gLastWrittenSector - 1;
     sector %= NUM_SECTORS_PER_SLOT;
-    sector += NUM_SECTORS_PER_SLOT * (gSaveCounter % NUM_SAVE_SLOTS);
+    sector += NUM_SECTORS_PER_SLOT * GetWritePhysicalGroup();
 
     // Write just the first byte of the signature field, which was skipped by HandleReplaceSector
     if (ProgramFlashByte(sector, SECTOR_SIGNATURE_OFFSET, SECTOR_SIGNATURE & 0xFF))
@@ -491,7 +516,7 @@ static u8 CopySaveSlotData(u16 sectorId, struct SaveSectorLocation *locations)
 {
     u16 i;
     u16 checksum;
-    u16 slotOffset = NUM_SECTORS_PER_SLOT * (gSaveCounter % NUM_SAVE_SLOTS);
+    u16 slotOffset = NUM_SECTORS_PER_SLOT * sSaveReadGroup;
     u16 id;
 
     for (i = 0; i < NUM_SECTORS_PER_SLOT; i++)
@@ -568,16 +593,21 @@ u8 SelectActiveSaveGroup(u8 manualGroupStatus, u8 autosaveGroupStatus)
     return SAVE_GROUP_NONE;
 }
 
-static u8 GetSaveValidStatus(const struct SaveSectorLocation *locations)
+// Peeks whether a physical group's SaveBlock2 sector carries the hybrid
+// autosave format marker, reading straight from flash. Like GetSaveGroupStatus,
+// this doesn't touch the active RAM save blocks or bookkeeping counters, and
+// requires gReadWriteSector to already point at a scratch buffer.
+bool8 GroupHasFormatMarker(u8 physicalGroup)
 {
-    u32 saveSlot1Counter = 0;
-    u32 saveSlot2Counter = 0;
-    u8 saveSlot1Status = GetSaveGroupStatus(0, locations, &saveSlot1Counter);
-    u8 saveSlot2Status = GetSaveGroupStatus(1, locations, &saveSlot2Counter);
+    ReadFlashSector(SECTOR_ID_SAVEBLOCK2 + physicalGroup * NUM_SECTORS_PER_SLOT, gReadWriteSector);
+    if (gReadWriteSector->signature != SECTOR_SIGNATURE || gReadWriteSector->id != SECTOR_ID_SAVEBLOCK2)
+        return FALSE;
+    return *(u32 *)&gReadWriteSector->data[offsetof(struct SaveBlock2, saveFormatMarker)] == SAVE_FORMAT_MARKER;
+}
 
-    // Preserve the current newest-valid scan for legacy saves. The role-based
-    // (SAVE_GROUP_MANUAL/SAVE_GROUP_AUTOSAVE) selection is only used once the
-    // save format marker confirms both groups are in the new fixed-role format.
+// Legacy (pre-hybrid-autosave) newest-valid two-slot scan, unchanged.
+static u8 GetLegacySaveValidStatus(u8 saveSlot1Status, u32 saveSlot1Counter, u8 saveSlot2Status, u32 saveSlot2Counter)
+{
     if (saveSlot1Status == SAVE_STATUS_OK && saveSlot2Status == SAVE_STATUS_OK)
     {
         if ((saveSlot1Counter == -1 && saveSlot2Counter ==  0)
@@ -629,6 +659,40 @@ static u8 GetSaveValidStatus(const struct SaveSectorLocation *locations)
     gSaveCounter = 0;
     gLastWrittenSector = 0;
     return SAVE_STATUS_CORRUPT;
+}
+
+static u8 GetSaveValidStatus(const struct SaveSectorLocation *locations)
+{
+    u32 manualCounter = 0;
+    u32 autosaveCounter = 0;
+    u8 manualStatus = GetSaveGroupStatus(SAVE_GROUP_MANUAL, locations, &manualCounter);
+    u8 autosaveStatus = GetSaveGroupStatus(SAVE_GROUP_AUTOSAVE, locations, &autosaveCounter);
+    u8 status;
+
+    // The format marker (checked directly on flash, not the possibly-stale RAM
+    // save blocks) distinguishes an already-migrated fixed-role save from a
+    // legacy rotating one. A group with valid checksums but no marker is a
+    // legacy backup, not a user-visible autosave snapshot.
+    if (GroupHasFormatMarker(SAVE_GROUP_MANUAL) || GroupHasFormatMarker(SAVE_GROUP_AUTOSAVE))
+    {
+        u8 activeGroup = SelectActiveSaveGroup(manualStatus, autosaveStatus);
+
+        if (activeGroup == SAVE_GROUP_NONE)
+        {
+            gSaveCounter = 0;
+            gLastWrittenSector = 0;
+            sSaveReadGroup = SAVE_GROUP_MANUAL;
+            return SAVE_STATUS_CORRUPT;
+        }
+
+        gSaveCounter = (activeGroup == SAVE_GROUP_MANUAL) ? manualCounter : autosaveCounter;
+        sSaveReadGroup = activeGroup;
+        return SAVE_STATUS_OK;
+    }
+
+    status = GetLegacySaveValidStatus(manualStatus, manualCounter, autosaveStatus, autosaveCounter);
+    sSaveReadGroup = gSaveCounter % NUM_SAVE_SLOTS;
+    return status;
 }
 
 static u8 TryLoadSaveSector(u8 sectorId, u8 *data, u16 size)
@@ -706,8 +770,18 @@ u8 HandleSavingData(u8 saveType)
 
     gTrainerHillVBlankCounter = NULL;
     UpdateSaveAddresses();
+    sSaveWriteRole = (saveType == SAVE_AUTOSAVE) ? SAVE_GROUP_AUTOSAVE : SAVE_GROUP_MANUAL;
     switch (saveType)
     {
+    case SAVE_AUTOSAVE:
+        // Snapshot the current party/object state into the fixed autosave
+        // physical group. GetWritePhysicalGroup routes this write there once
+        // the save has migrated; before that (no manual save has migrated
+        // this save yet) it's not safe to claim a role-specific group, so it
+        // falls back to the same legacy alternation a normal save would use.
+        CopyPartyAndObjectsToSave();
+        WriteSaveSectorOrSlot(FULL_SAVE_SLOT, gRamSaveSectorLocations);
+        break;
     case SAVE_HALL_OF_FAME_ERASE_BEFORE:
         // Unused. Erases the special save sectors (HOF, Trainer Hill, Recorded Battle)
         // before overwriting HOF.
@@ -755,6 +829,14 @@ u8 HandleSavingData(u8 saveType)
         WriteSaveSectorOrSlot(FULL_SAVE_SLOT, gRamSaveSectorLocations);
         break;
     }
+
+    // On the first successful manual save, migrate to the fixed-role format:
+    // this save itself still used whatever group legacy alternation or the
+    // manual role dictated, but every save from here on will target the fixed
+    // manual/autosave groups directly instead of rotating.
+    if (saveType != SAVE_AUTOSAVE && !gDamagedSaveSectors)
+        gSaveBlock2Ptr->saveFormatMarker = SAVE_FORMAT_MARKER;
+
     gTrainerHillVBlankCounter = backupVar;
     return 0;
 }
@@ -786,6 +868,7 @@ bool8 LinkFullSave_Init(void)
     if (gFlashMemoryPresent != TRUE)
         return TRUE;
     UpdateSaveAddresses();
+    sSaveWriteRole = SAVE_GROUP_MANUAL; // Link full save is a manual-role write
     CopyPartyAndObjectsToSave();
     RestoreSaveBackupVarsAndIncrement(gRamSaveSectorLocations);
     return FALSE;
@@ -828,6 +911,7 @@ bool8 WriteSaveBlock2(void)
         return TRUE;
 
     UpdateSaveAddresses();
+    sSaveWriteRole = SAVE_GROUP_MANUAL; // Used for link saves; always manual-role
     CopyPartyAndObjectsToSave();
     RestoreSaveBackupVars(gRamSaveSectorLocations);
 
@@ -913,7 +997,7 @@ u16 GetSaveBlocksPointersBaseOffset(void)
         return 0;
     UpdateSaveAddresses();
     GetSaveValidStatus(gRamSaveSectorLocations);
-    slotOffset = NUM_SECTORS_PER_SLOT * (gSaveCounter % NUM_SAVE_SLOTS);
+    slotOffset = NUM_SECTORS_PER_SLOT * sSaveReadGroup;
     for (i = 0; i < NUM_SECTORS_PER_SLOT; i++)
     {
         ReadFlashSector(i + slotOffset, gReadWriteSector);
