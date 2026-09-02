@@ -2614,7 +2614,14 @@ static void Task_RegisteredItemShortcutMenu(u8 taskId)
         PlayerFreeze();
         StopPlayerAvatar();
         gSpecialVar_ItemId = item;
-        CreateTask(GetItemFieldFunc(item), 8);
+        {
+            // tUsingRegisteredKeyItem (data[3], see item_use.c) must be set on
+            // the item-use task so its field-dispatch code (SetUpItemUseCallback)
+            // takes the field-use branch instead of assuming it was opened from
+            // the Bag menu and dereferencing the (NULL here) gBagMenu pointer.
+            u8 useTaskId = CreateTask(GetItemFieldFunc(item), 8);
+            gTasks[useTaskId].data[3] = TRUE;
+        }
     }
 }
 
