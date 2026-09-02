@@ -137,3 +137,43 @@ TEST("A successful manual save migrates the format marker for the next save")
     // the fixed manual group directly instead of legacy alternation.
     EXPECT_EQ(gSaveBlock2Ptr->saveFormatMarker, SAVE_FORMAT_MARKER);
 }
+
+// Read-side routing (sSaveReadGroup, set by GetSaveValidStatus and consumed
+// by CopySaveSlotData/GetSaveBlocksPointersBaseOffset). ReadFlashSector
+// doesn't touch the flash write timer, so a read after one real write
+// doesn't hit the Timer2 conflict described above.
+
+TEST("The Continue load reads back the manual save from its physical group")
+{
+    SetSaveBlocksPointers(0);
+    ClearSaveData();
+    Save_ResetSaveCounters();
+    gSaveBlock2Ptr->saveFormatMarker = SAVE_FORMAT_MARKER;
+
+    TrySavingData(SAVE_NORMAL);
+
+    // Clobber RAM so a stale/wrong value can't make the read-back check pass
+    // by accident; LoadGameSave has to actually copy it back from flash.
+    gSaveBlock2Ptr->saveFormatMarker = 0;
+
+    EXPECT_EQ(LoadGameSave(SAVE_NORMAL), SAVE_STATUS_OK);
+    EXPECT_EQ(gSaveBlock2Ptr->saveFormatMarker, SAVE_FORMAT_MARKER);
+}
+
+TEST("Autosave recovery reads back the autosave from its physical group")
+{
+    SetSaveBlocksPointers(0);
+    ClearSaveData();
+    Save_ResetSaveCounters();
+    gSaveBlock2Ptr->saveFormatMarker = SAVE_FORMAT_MARKER;
+
+    // No manual save exists, so the only valid group is the autosave one;
+    // GetSaveValidStatus's SelectActiveSaveGroup fallback must resolve the
+    // read to physical group 1, not the (empty) manual group 0.
+    TrySavingData(SAVE_AUTOSAVE);
+
+    gSaveBlock2Ptr->saveFormatMarker = 0;
+
+    EXPECT_EQ(LoadGameSave(SAVE_NORMAL), SAVE_STATUS_OK);
+    EXPECT_EQ(gSaveBlock2Ptr->saveFormatMarker, SAVE_FORMAT_MARKER);
+}

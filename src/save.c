@@ -597,12 +597,24 @@ u8 SelectActiveSaveGroup(u8 manualGroupStatus, u8 autosaveGroupStatus)
 // autosave format marker, reading straight from flash. Like GetSaveGroupStatus,
 // this doesn't touch the active RAM save blocks or bookkeeping counters, and
 // requires gReadWriteSector to already point at a scratch buffer.
+//
+// The SaveBlock2 sector isn't always physically at the group's first sector:
+// HandleWriteSector rotates each logical sector id by gLastWrittenSector
+// within the group, so this has to scan by id like GetSaveGroupStatus and
+// CopySaveSlotData already do, not assume a fixed physical offset.
 bool8 GroupHasFormatMarker(u8 physicalGroup)
 {
-    ReadFlashSector(SECTOR_ID_SAVEBLOCK2 + physicalGroup * NUM_SECTORS_PER_SLOT, gReadWriteSector);
-    if (gReadWriteSector->signature != SECTOR_SIGNATURE || gReadWriteSector->id != SECTOR_ID_SAVEBLOCK2)
-        return FALSE;
-    return *(u32 *)&gReadWriteSector->data[offsetof(struct SaveBlock2, saveFormatMarker)] == SAVE_FORMAT_MARKER;
+    u16 i;
+    u16 sectorOffset = physicalGroup * NUM_SECTORS_PER_SLOT;
+
+    for (i = 0; i < NUM_SECTORS_PER_SLOT; i++)
+    {
+        ReadFlashSector(i + sectorOffset, gReadWriteSector);
+        if (gReadWriteSector->signature == SECTOR_SIGNATURE && gReadWriteSector->id == SECTOR_ID_SAVEBLOCK2)
+            return *(u32 *)&gReadWriteSector->data[offsetof(struct SaveBlock2, saveFormatMarker)] == SAVE_FORMAT_MARKER;
+    }
+
+    return FALSE;
 }
 
 // Legacy (pre-hybrid-autosave) newest-valid two-slot scan, unchanged.
