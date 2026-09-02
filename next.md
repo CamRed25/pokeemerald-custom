@@ -58,8 +58,19 @@ next up
   interaction with the fixed code. Screenshots:
   `.claude/tests/mgba/screenshots/verify3_02_select_pressed.png` (wheel open),
   `verify3_03_after_dpad_up.png` (item used, Dad's advice message).
-- Objectives 11, 13, 14, 15b — triaged 2026-08-28 (see "Objective 10-15 triage" below
-  for rankings, donor viability, and complexity findings). Not yet implemented.
+- Objective 15b (Improved move-info panel) — DONE, checkpointed 2026-09-01 (commit
+  `09a1bc1618`, "Add improved move-info panel"). Adapted from
+  worpbane/pokeemerald-worped-ex per the scope-narrowing note below (type + category
+  icons only, no effectiveness/STAB icons, no new sprites). Build verified clean;
+  `mgba-tester` confirmed correct type/category icon pairings in the FIGHT menu across
+  all 4 move slots with no tile corruption and no crash cycling through them. A
+  separate, unrelated bug was found and fixed alongside checkpointing (not part of
+  this objective's scope, committed on its own branch): `Task_RegisteredItemShortcutMenu`
+  (Objective 11) wasn't setting `tUsingRegisteredKeyItem` on the item-use task it
+  creates, so `item_use.c`'s field-dispatch code fell through to the Bag-menu path and
+  dereferenced a NULL `gBagMenu` — fixed in commit `3fe80995d1`.
+- Objectives 13, 14 — triaged 2026-08-28, BLOCKED (see "Objective 10-15 triage" below
+  for why). Not yet implemented.
 - Objectives 16-17 — optional, lower priority than 9-15, not yet triaged.
 - "New candidate features" (donors 5-11, near the bottom of this file) — NOT triaged, NOT
   integration-ordered yet. Do not start any of them before triage.
@@ -214,10 +225,8 @@ In progress:
 15. Catch Mode — carried over from the original plan, not yet scheduled relative to 9-14.
     Donor: worpbane/pokeemerald-worped-ex (see donor map above).
 
-Untracked item noticed in donor map scope, no integration-order slot assigned yet:
-- "improved move-info panel" is listed under worpbane's covered features (donor map section
-  1 above) but was never given a numbered objective. Decide whether it becomes its own item
-  or folds into an existing one (e.g. Catch Mode) before starting it.
+"improved move-info panel" (donor map section 1 above) resolved as Objective 15b —
+DONE, checkpointed 2026-09-01, see Status summary above.
 
 Optional content expansions (later, lower priority than 9-15):
 
