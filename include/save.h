@@ -37,6 +37,18 @@
 #define SAVE_STATUS_NO_FLASH 4
 #define SAVE_STATUS_ERROR    0xFF
 
+// Logical save group roles for the hybrid autosave format.
+// Physical group 0 (sectors 0-13) is reserved for the manual save;
+// physical group 1 (sectors 14-27) is reserved for the autosave snapshot.
+#define SAVE_GROUP_MANUAL   0
+#define SAVE_GROUP_AUTOSAVE 1
+#define SAVE_GROUP_NONE     0xFF // Neither group is valid/recoverable
+
+// Value written to SaveBlock2's saveFormatMarker field once a save group has
+// been written using the fixed-role hybrid autosave format below. Legacy
+// saves predate this field and won't have this exact value present.
+#define SAVE_FORMAT_MARKER 0x53415631 // "SAV1"
+
 // Special sector id value for certain save functions to
 // indicate that no specific sector should be used.
 #define FULL_SAVE_SLOT 0xFFFF
@@ -96,6 +108,8 @@ extern struct SaveSector gSaveDataBuffer;
 
 void ClearSaveData(void);
 void Save_ResetSaveCounters(void);
+u8 GetSaveGroupStatus(u8 physicalGroup, const struct SaveSectorLocation *locations, u32 *saveCounter);
+u8 SelectActiveSaveGroup(u8 manualGroupStatus, u8 autosaveGroupStatus);
 u8 HandleSavingData(u8 saveType);
 u8 TrySavingData(u8 saveType);
 bool8 LinkFullSave_Init(void);

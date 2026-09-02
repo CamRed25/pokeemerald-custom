@@ -517,78 +517,67 @@ static u8 CopySaveSlotData(u16 sectorId, struct SaveSectorLocation *locations)
     return SAVE_STATUS_OK;
 }
 
-static u8 GetSaveValidStatus(const struct SaveSectorLocation *locations)
+// Validates one physical save group (0 or 1, i.e. sectors 0-13 or 14-27) against
+// the given sector locations/sizes. Pure with respect to the active RAM save
+// blocks: it only reads flash into gReadWriteSector and reports status, it never
+// copies sector data into `locations` or touches gSaveCounter/gLastWrittenSector.
+// On success (status != SAVE_STATUS_EMPTY with valid sectors found), *saveCounter
+// is set to the save counter recorded in the group's sectors.
+u8 GetSaveGroupStatus(u8 physicalGroup, const struct SaveSectorLocation *locations, u32 *saveCounter)
 {
     u16 i;
     u16 checksum;
-    u32 saveSlot1Counter = 0;
-    u32 saveSlot2Counter = 0;
+    u16 sectorOffset = physicalGroup * NUM_SECTORS_PER_SLOT;
     u32 validSectorFlags = 0;
     bool8 signatureValid = FALSE;
-    u8 saveSlot1Status;
-    u8 saveSlot2Status;
 
-    // Check save slot 1
     for (i = 0; i < NUM_SECTORS_PER_SLOT; i++)
     {
-        ReadFlashSector(i, gReadWriteSector);
+        ReadFlashSector(i + sectorOffset, gReadWriteSector);
         if (gReadWriteSector->signature == SECTOR_SIGNATURE)
         {
             signatureValid = TRUE;
             checksum = CalculateChecksum(gReadWriteSector->data, locations[gReadWriteSector->id].size);
             if (gReadWriteSector->checksum == checksum)
             {
-                saveSlot1Counter = gReadWriteSector->counter;
+                *saveCounter = gReadWriteSector->counter;
                 validSectorFlags |= 1 << gReadWriteSector->id;
             }
         }
     }
 
-    if (signatureValid)
-    {
-        if (validSectorFlags == (1 << NUM_SECTORS_PER_SLOT) - 1)
-            saveSlot1Status = SAVE_STATUS_OK;
-        else
-            saveSlot1Status = SAVE_STATUS_ERROR;
-    }
-    else
-    {
-        // No sectors in slot 1 have the correct signature, treat it as empty
-        saveSlot1Status = SAVE_STATUS_EMPTY;
-    }
+    if (!signatureValid)
+        return SAVE_STATUS_EMPTY; // No sectors in this group have the correct signature, treat it as empty
 
-    validSectorFlags = 0;
-    signatureValid = FALSE;
+    if (validSectorFlags == (1 << NUM_SECTORS_PER_SLOT) - 1)
+        return SAVE_STATUS_OK;
 
-    // Check save slot 2
-    for (i = 0; i < NUM_SECTORS_PER_SLOT; i++)
-    {
-        ReadFlashSector(i + NUM_SECTORS_PER_SLOT, gReadWriteSector);
-        if (gReadWriteSector->signature == SECTOR_SIGNATURE)
-        {
-            signatureValid = TRUE;
-            checksum = CalculateChecksum(gReadWriteSector->data, locations[gReadWriteSector->id].size);
-            if (gReadWriteSector->checksum == checksum)
-            {
-                saveSlot2Counter = gReadWriteSector->counter;
-                validSectorFlags |= 1 << gReadWriteSector->id;
-            }
-        }
-    }
+    return SAVE_STATUS_ERROR;
+}
 
-    if (signatureValid)
-    {
-        if (validSectorFlags == (1 << NUM_SECTORS_PER_SLOT) - 1)
-            saveSlot2Status = SAVE_STATUS_OK;
-        else
-            saveSlot2Status = SAVE_STATUS_ERROR;
-    }
-    else
-    {
-        // No sectors in slot 2 have the correct signature, treat it as empty.
-        saveSlot2Status = SAVE_STATUS_EMPTY;
-    }
+// Chooses which physical save group should be treated as active/loadable, given
+// each group's validity status. The manual group is always preferred when valid;
+// the autosave group is only used as a fallback, and only when it's actually
+// valid, since a corrupt/empty autosave is not recoverable data.
+u8 SelectActiveSaveGroup(u8 manualGroupStatus, u8 autosaveGroupStatus)
+{
+    if (manualGroupStatus == SAVE_STATUS_OK)
+        return SAVE_GROUP_MANUAL;
+    if (autosaveGroupStatus == SAVE_STATUS_OK)
+        return SAVE_GROUP_AUTOSAVE;
+    return SAVE_GROUP_NONE;
+}
 
+static u8 GetSaveValidStatus(const struct SaveSectorLocation *locations)
+{
+    u32 saveSlot1Counter = 0;
+    u32 saveSlot2Counter = 0;
+    u8 saveSlot1Status = GetSaveGroupStatus(0, locations, &saveSlot1Counter);
+    u8 saveSlot2Status = GetSaveGroupStatus(1, locations, &saveSlot2Counter);
+
+    // Preserve the current newest-valid scan for legacy saves. The role-based
+    // (SAVE_GROUP_MANUAL/SAVE_GROUP_AUTOSAVE) selection is only used once the
+    // save format marker confirms both groups are in the new fixed-role format.
     if (saveSlot1Status == SAVE_STATUS_OK && saveSlot2Status == SAVE_STATUS_OK)
     {
         if ((saveSlot1Counter == -1 && saveSlot2Counter ==  0)

@@ -1,11 +1,12 @@
 #include "global.h"
 #include "pokemon_storage_system.h"
+#include "save.h"
 #include "test/test.h"
 
 // If you would like to ensure save compatibility, update the values below with those for your hack. You can find these through the debug menu.
 // Please note that this simple check is not 100% foolproof, but should be able to catch most unintended shifts.
 #define T_SAVEBLOCK1_SIZE 15596
-#define T_SAVEBLOCK2_SIZE 3892
+#define T_SAVEBLOCK2_SIZE 3896
 #define T_SAVEBLOCK3_SIZE 16
 #define T_POKEMONSTORAGE_SIZE 34144
 
@@ -33,3 +34,26 @@ TEST("PokemonStorage is backwards compatible")
 #undef T_SAVEBLOCK2_SIZE
 #undef T_SAVEBLOCK3_SIZE
 #undef T_POKEMONSTORAGE_SIZE
+
+// Logical save group selection (hybrid autosave foundation, see save.h)
+
+TEST("Manual save role maps to physical group 0")
+{
+    EXPECT_EQ(SAVE_GROUP_MANUAL, 0);
+}
+
+TEST("Autosave save role maps to physical group 1")
+{
+    EXPECT_EQ(SAVE_GROUP_AUTOSAVE, 1);
+}
+
+TEST("An invalid autosave group is not recoverable")
+{
+    EXPECT_EQ(SelectActiveSaveGroup(SAVE_STATUS_EMPTY, SAVE_STATUS_CORRUPT), SAVE_GROUP_NONE);
+    EXPECT_EQ(SelectActiveSaveGroup(SAVE_STATUS_ERROR, SAVE_STATUS_EMPTY), SAVE_GROUP_NONE);
+}
+
+TEST("A valid manual group remains preferred when both groups are valid")
+{
+    EXPECT_EQ(SelectActiveSaveGroup(SAVE_STATUS_OK, SAVE_STATUS_OK), SAVE_GROUP_MANUAL);
+}

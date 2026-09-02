@@ -636,7 +636,8 @@ struct SaveBlock2
     /*0x64C*/ struct BattleFrontier frontier;
     u8 questData[DIV_ROUND_UP(QUEST_COUNT, 8) * QUEST_STATES];
     u8 subQuests[DIV_ROUND_UP(SUB_QUEST_COUNT, 8)];
-}; // sizeof=0xF34 (was 0xF2C before the additive questData/subQuests fields)
+    u32 saveFormatMarker; // SAVE_FORMAT_MARKER once written by the hybrid autosave format, see save.h
+}; // sizeof=0xF38 (was 0xF34 before the additive saveFormatMarker field)
 
 extern struct SaveBlock2 *gSaveBlock2Ptr;
 
