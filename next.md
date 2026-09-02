@@ -294,6 +294,22 @@ Optional content expansions (later, lower priority than 9-15):
     plan `bag-overflow-to-pc-integration`), not duplicated here. Not yet implemented — next
     step is a `migration-worker` pass on a new `feature/bag-overflow-to-pc` branch per that
     plan.
+22. Hybrid autosave — Designed and planned 2026-09-01, NOT donor-sourced (an original design
+    against upstream `pret/pokeemerald` save-format research, unlike every other objective in
+    this file) — distinct from the unscheduled "Autosave after Pokémon Center healing"
+    candidate feature below (Expanded-Emerald), which is just a trigger point, not a save-format
+    change. Repurposes the target's two existing complete 14-sector flash save groups (currently
+    alternating same-role rotating copies) as fixed logical roles: group 0 = manual save, group 1
+    = autosave snapshot. Sectors 28-31 (Hall of Fame/Trainer Hill/Recorded Battle) untouched, no
+    third snapshot added. Autosaves trigger only at stable overworld map-load boundaries (never
+    in battle/link/Pyramid/menus/fades), are optional (Options Plus toggle, default on), and
+    require an explicit title-screen recovery choice — normal Continue always prefers the manual
+    save. Legacy (pre-autosave) saves keep loading via the existing newest-valid scan until the
+    first post-migration manual save establishes the new fixed-role marker. Full design in
+    `docs/superpowers/specs/2026-09-01-hybrid-autosave-design.md`, 5-task TDD implementation plan
+    in `docs/superpowers/plans/2026-09-01-hybrid-autosave.md` (mirrored in TheBrain
+    `projects/emerald`: objective `hybrid-autosave`, plan `hybrid-autosave-integration`). Started
+    2026-09-02 on `feature/hybrid-autosave` per explicit user direction.
 
 ## Open bugs / issues — RESOLVED 2026-08-28, Quest Menu checkpointed (commit 24c45661b8)
 
@@ -414,26 +430,32 @@ order to implement, highest first:
    BG windows (`B_WIN_MOVE_TYPE` shrunk to 4 tiles + new `B_WIN_MOVE_CATEGORY` appended at enum
    value 26) using the existing `BlitBitmapToWindow`/window-lifecycle infra already correct for
    `B_WIN_MOVE_TYPE` — no new sprites, no donor move-info-window-background PNGs ported.
-6. **Objective 13 (Mugshots + dialogue nameplates) — 15%, BLOCKED.** Donor (poketransform) has
-   NO usable source code — confirmed via `gh api` against Ddaretrogamer/poketransform: only a
-   README, box art PNGs, and a PMD sprite/portrait art-credits file. Cannot be scheduled as a
-   code port until an alternate donor is found (a live GitHub repo search for a code source
-   timed out mid-session and wasn't completed — retry that, or find a different reference,
-   before revisiting this objective).
-7. **Objective 14 (Enhanced lighting) — 12%, BLOCKED.** Donor (zanderb27/emerald-plus)
-   verified to NOT contain the advertised lighting features (weather-compatible shading,
-   GSC-style window lights, HGSS-style alpha-blended shadows) in its public master branch —
-   checked via targeted grep across src/include (only false-positive match was the unrelated
-   vanilla Team Rocket Hideout elevator light animation, src/field_specials.c). No
-   `lighting`/`lighting-expanded-id` branch exists on the remote either (confirmed via
-   `git ls-remote`). The donor map's claim for this feature does not hold up under
-   verification. On the plus side, the TARGET already has the day/night + weather substrate
+6. **Objective 13 (Mugshots + dialogue nameplates) — donor blocker resolved, needs port scoping.**
+   `poketransform` has no usable source code. Fresh source search found that this target already
+   contains the Expansion dialogue-namebox implementation, while Mudskip's actual
+   `feature/field-mugshot` branch provides a usable overworld portrait reference. Treat these as
+   separate scopes; audit the older vanilla/Expansion-1.10.x portrait branch for graphics/build
+   registrations, inline text controls, temporary-variable collisions, and attribution before
+   implementation. See `docs/research/mugshots-dialogue-nameplates-donor-search.md` and TheBrain
+   `findings/mugshots-dialogue-nameplates-donor-search`.
+7. **Objective 14 (Enhanced lighting) — donor blocker resolved; needs content scoping.** Donor
+   (zanderb27/emerald-plus) does not contain the advertised system. Fresh audit found the target
+   already has the RHH engine for day/night tinting, weather-compatible shading, night light
+   sprites, and overworld shadows. The missing piece is authored content. Use the canonical RHH
+   pre-removal state pinned at `1e6628b78dbd87a5b0507ea4d656181f238ec755` (parent of removal
+   commit `a5b079d833f18f66ebd53ac77f00227ae4a1f389`) as the Hoenn `.pla`, alternate-palette,
+   light-object, and tileset/map reference. Adapt current maps and headers; do not wholesale
+   revert. Custom/FRLG lighting needs separate content design. See
+   `docs/research/enhanced-lighting-donor-search.md` and TheBrain
+   `findings/enhanced-lighting-donor-search`.
    this would hook into (`gTimeOfDay`, `UpdateTimeOfDay()`, `ApplyFogBlend()`,
    `MapHasNaturalLight()` in src/field_weather.c) — so once/if a real donor or from-scratch
    design is found, the integration point is ready. Not schedulable as a port right now.
-8. **Objectives 16-17 (Game Corner / Battle Frontier) — not scored, no donor identified.**
-   Optional/lower-priority per next.md's own framing; still needs a concrete donor repo
-   search before any triage is possible. Left untouched this pass.
+8. **Objectives 16-17 (Game Corner / Battle Frontier) — triaged 2026-09-02, deferred/design-gated.**
+   Game Corner has real but very large old-base sources; if resumed, select one game first
+   (Voltorb Flip is the smallest verified standalone source). Battle Arcade is already Objective
+   19, modern opponent-set generation remains overhaul-design-gated, and no Hall/Castle donor was
+   found. See `docs/research/optional-donor-triage-2026-09-02.md`.
 
 ## Explicitly not prioritized right now
 
@@ -449,7 +471,7 @@ RHH already exposes), verify each donor's implementation is actually present and
 that repo (not just claimed), and decide which merit their own numbered objective vs. folding into
 an existing one.
 
-### Candidate donor map (new, unvetted)
+### Candidate donor map (triaged 2026-09-02; not implementation approvals)
 
 5. makiwu/dreamstone-mysteries — RHH-derived source tree.
    - Fishing minigame (Bivurnum's implementation)
@@ -499,13 +521,13 @@ an existing one.
       flags its current version as partly nonfunctional — treat as experimental / lowest
       priority; verify it actually works before committing any time to it.
 
-### Candidate feature list (unscheduled, donor in parentheses)
+### Candidate feature list (triaged, unscheduled unless noted; donor in parentheses)
 
 - Fishing minigame (dreamstone-mysteries) — triaged 2026-08-31, promoted to Objective 18 above,
   no longer unscheduled.
-- Mining minigame (dreamstone-mysteries)
+- Mining minigame (dreamstone-mysteries) — promote to design/implementation; pinned and source-verified
 - Battle speed setting (dreamstone-mysteries or FireRed Enhanced — compare both)
-- Dialogue auto-scroll (Expanded-Emerald)
+- Dialogue auto-scroll (Expanded-Emerald) — design from scratch using target `gTextFlags.autoScroll`
 - HP/EXP bar speed control (Expanded-Emerald) — fits directly into the existing Options Plus menu
 - Remember last battle cursor/action (Expanded-Emerald)
 - Autosave after Pokémon Center healing (Expanded-Emerald)
@@ -514,8 +536,8 @@ an existing one.
 - Egg hatch speed (Expanded-Emerald)
 - Player-facing intro/tutorial skips (Expanded-Emerald) — note RHH's own Quickstart is
   dev-only/disabled in release builds, so this would be a separate, player-facing implementation
-- PokéVial (pokeemerald-expansion-kaya)
-- Menu clock (pokeyaeeh / emeraldextra)
+- PokéVial (pokeemerald-expansion-kaya) — defer pending healing-economy design
+- Menu clock (pokeyaeeh / emeraldextra) — design directly for live Unbound Start Menu
 - Outfit system (emeraldextra)
 - Change direction while moving (emeraldextra)
 - Pokédex area day/night toggle (emeraldextra)
