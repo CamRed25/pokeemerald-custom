@@ -13,6 +13,7 @@
 #include "battle_gimmick.h"
 #include "bg.h"
 #include "data.h"
+#include "graphics.h"
 #include "item.h"
 #include "item_menu.h"
 #include "link.h"
@@ -1705,12 +1706,40 @@ static void MoveSelectionDisplayPPNumber(enum BattlerId battler)
     BattlePutTextOnWindow(gDisplayedStringBattle, B_WIN_PP_REMAINING);
 }
 
+// Move-info panel type/category icons: gMoveInfoTypeIcons_Gfx and gMoveInfoCategoryIcons_Gfx
+// are ported, uncompressed 32x16 4bpp icon strips (graphics/battle_interface/wMoveInfo_*.png),
+// direct-indexed by type/category. Reuses the existing gMoveTypes_Pal (same source data as the
+// donor's own gMoveTypes_Pal) for type coloring.
+static void MoveSelectionDisplayMoveTypeCategoryIcons(enum Type type, enum DamageCategory category)
+{
+    u32 typeIconBuffer[0x100 / sizeof(u32)];
+    u32 catIconBuffer[0x100 / sizeof(u32)];
+    u8 palNum = gTypesInfo[type].palette;
+
+    if (category > DAMAGE_CATEGORY_STATUS)
+        category = DAMAGE_CATEGORY_PHYSICAL;
+    CpuCopy16((const u8 *)gMoveInfoTypeIcons_Gfx + (u32)(type + 1) * 0x100, typeIconBuffer, 0x100);
+    CpuCopy16((const u8 *)gMoveInfoCategoryIcons_Gfx + (u32)category * 0x100, catIconBuffer, 0x100);
+
+    if (palNum >= 13 && palNum <= 15)
+        LoadPalette(gMoveTypes_Pal + (palNum - 13) * 16, BG_PLTT_ID(12), PLTT_SIZE_4BPP);
+    LoadPalette(gMoveInfoCategoryIcons_Pal, BG_PLTT_ID(13), PLTT_SIZE_4BPP);
+
+    FillWindowPixelBuffer(B_WIN_MOVE_TYPE, PIXEL_FILL(0));
+    BlitBitmapToWindow(B_WIN_MOVE_TYPE, (const u8 *)typeIconBuffer, 0, 0, 32, 16);
+    PutWindowTilemap(B_WIN_MOVE_TYPE);
+    CopyWindowToVram(B_WIN_MOVE_TYPE, COPYWIN_FULL);
+
+    FillWindowPixelBuffer(B_WIN_MOVE_CATEGORY, PIXEL_FILL(0));
+    BlitBitmapToWindow(B_WIN_MOVE_CATEGORY, (const u8 *)catIconBuffer, 0, 0, 32, 16);
+    PutWindowTilemap(B_WIN_MOVE_CATEGORY);
+    CopyWindowToVram(B_WIN_MOVE_CATEGORY, COPYWIN_FULL);
+}
+
 static void MoveSelectionDisplayMoveType(enum BattlerId battler)
 {
-    u8 *txtPtr, *end;
     enum Species speciesId = gBattleMons[battler].species;
     struct ChooseMoveStruct *moveInfo = (struct ChooseMoveStruct *)(&gBattleResources->bufferA[battler][4]);
-    txtPtr = StringCopy(gDisplayedStringBattle, gText_MoveInterfaceType);
     enum Move move = moveInfo->moves[gMoveSelectionCursor[battler]];
     enum Type type = GetMoveType(move);
     enum BattleMoveEffects effect = GetMoveEffect(move);
@@ -1743,10 +1772,8 @@ static void MoveSelectionDisplayMoveType(enum BattlerId battler)
         struct Pokemon *mon = GetBattlerMon(battler);
         type = CheckDynamicMoveType(mon, move, battler, MON_IN_BATTLE);
     }
-    end = StringCopy(txtPtr, gTypesInfo[type].name);
 
-    PrependFontIdToFit(txtPtr, end, FONT_NORMAL, WindowWidthPx(B_WIN_MOVE_TYPE) - 25);
-    BattlePutTextOnWindow(gDisplayedStringBattle, B_WIN_MOVE_TYPE);
+    MoveSelectionDisplayMoveTypeCategoryIcons(type, GetMoveCategory(move));
 }
 
 static void TryMoveSelectionDisplayMoveDescription(enum BattlerId battler)
