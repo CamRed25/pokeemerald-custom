@@ -225,14 +225,14 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .paletteNum = 5,
         .baseBlock = 0x0290,
     },
-    [B_WIN_DUMMY] = {
+    [B_WIN_MOVE_CATEGORY] = {
         .bg = 0,
-        .tilemapLeft = 21,
+        .tilemapLeft = 25,
         .tilemapTop = 57,
-        .width = 0,
-        .height = 0,
-        .paletteNum = 5,
-        .baseBlock = 0x0298,
+        .width = 4,
+        .height = 2,
+        .paletteNum = 13,
+        .baseBlock = 0x02a8,
     },
     [B_WIN_PP_REMAINING] = {
         .bg = 0,
@@ -247,9 +247,9 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .bg = 0,
         .tilemapLeft = 21,
         .tilemapTop = 57,
-        .width = 8,
+        .width = 4,
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x02a0,
     },
     [B_WIN_SWITCH_PROMPT] = {
@@ -455,14 +455,14 @@ static const struct WindowTemplate sKantoTutorialBattleWindowTemplates[] =
         .paletteNum = 5,
         .baseBlock = 0x0290,
     },
-    [B_WIN_DUMMY] = {
+    [B_WIN_MOVE_CATEGORY] = {
         .bg = 0,
-        .tilemapLeft = 21,
+        .tilemapLeft = 25,
         .tilemapTop = 57,
-        .width = 0,
-        .height = 0,
-        .paletteNum = 5,
-        .baseBlock = 0x0298,
+        .width = 4,
+        .height = 2,
+        .paletteNum = 13,
+        .baseBlock = 0x02a8,
     },
     [B_WIN_PP_REMAINING] = {
         .bg = 0,
@@ -477,9 +477,9 @@ static const struct WindowTemplate sKantoTutorialBattleWindowTemplates[] =
         .bg = 0,
         .tilemapLeft = 21,
         .tilemapTop = 57,
-        .width = 8,
+        .width = 4,
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x02a0,
     },
     [B_WIN_SWITCH_PROMPT] = {
@@ -694,14 +694,14 @@ static const struct WindowTemplate sBattleArenaWindowTemplates[] =
         .paletteNum = 5,
         .baseBlock = 0x0290,
     },
-    [B_WIN_DUMMY] = {
+    [B_WIN_MOVE_CATEGORY] = {
         .bg = 0,
-        .tilemapLeft = 21,
+        .tilemapLeft = 25,
         .tilemapTop = 57,
-        .width = 0,
-        .height = 0,
-        .paletteNum = 5,
-        .baseBlock = 0x0298,
+        .width = 4,
+        .height = 2,
+        .paletteNum = 13,
+        .baseBlock = 0x02a8,
     },
     [B_WIN_PP_REMAINING] = {
         .bg = 0,
@@ -716,9 +716,9 @@ static const struct WindowTemplate sBattleArenaWindowTemplates[] =
         .bg = 0,
         .tilemapLeft = 21,
         .tilemapTop = 57,
-        .width = 8,
+        .width = 4,
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x02a0,
     },
     [B_WIN_SWITCH_PROMPT] = {
@@ -1369,4 +1369,3 @@ void DrawTerrainTypeBattleBackground(void)
         break;
     }
 }
-

@@ -1650,7 +1650,7 @@ static const struct BattleWindowText sTextOnWindowsInfo_Normal[] =
         .color.accent = 14,
         .color.shadow = B_SHOW_EFFECTIVENESS != SHOW_EFFECTIVENESS_NEVER ? 15 : 11,
     },
-    [B_WIN_DUMMY] = {
+    [B_WIN_MOVE_CATEGORY] = {
         .fillValue = PIXEL_FILL(0xE),
         .fontId = FONT_NORMAL,
         .x = 0,
@@ -1923,7 +1923,7 @@ static const struct BattleWindowText sTextOnWindowsInfo_KantoTutorial[] =
         .color.accent = 14,
         .color.shadow = B_SHOW_EFFECTIVENESS != SHOW_EFFECTIVENESS_NEVER ? 15 : 11,
     },
-    [B_WIN_DUMMY] = {
+    [B_WIN_MOVE_CATEGORY] = {
         .fillValue = PIXEL_FILL(0xE),
         .fontId = FONT_NORMAL,
         .x = 0,
@@ -2208,7 +2208,7 @@ static const struct BattleWindowText sTextOnWindowsInfo_Arena[] =
         .color.accent = 14,
         .color.shadow = B_SHOW_EFFECTIVENESS != SHOW_EFFECTIVENESS_NEVER ? 15 : 11,
     },
-    [B_WIN_DUMMY] = {
+    [B_WIN_MOVE_CATEGORY] = {
         .fillValue = PIXEL_FILL(0xE),
         .fontId = FONT_NORMAL,
         .x = 0,

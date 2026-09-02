@@ -1712,6 +1712,11 @@ const u32 gCategoryIcons_Gfx[] = INCGFX_U32("graphics/interface/category_icons.p
 const u32 gMoveTypes_Gfx[] = INCGFX_U32("graphics/types/move_types.4bpp", ".smol");
 const u16 gMoveTypes_Pal[] = INCBIN_U16("graphics/types/move_types.gbapal");
 
+// Move-selection screen move-info panel icons (uncompressed, direct-indexed by GetMoveTypeIconData/GetCatTypeIconData)
+const u16 gMoveInfoCategoryIcons_Pal[] = INCGFX_U16("graphics/battle_interface/wMoveInfo_Categories.png", ".gbapal");
+const u32 gMoveInfoCategoryIcons_Gfx[] = INCGFX_U32("graphics/battle_interface/wMoveInfo_Categories.png", ".4bpp");
+const u32 gMoveInfoTypeIcons_Gfx[] = INCGFX_U32("graphics/battle_interface/wMoveInfo_Types.png", ".4bpp");
+
 const u32 gSummaryMoveSelect_Gfx[] = INCGFX_U32("graphics/summary_screen/move_select.png", ".4bpp.smol");
 const u16 gSummaryMoveSelect_Pal[] = INCGFX_U16("graphics/summary_screen/move_select.png", ".gbapal");
 
