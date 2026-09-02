@@ -18,6 +18,37 @@ At the beginning of every run:
 4. Do not duplicate or rewrite `next.md` into this workflow.
 5. If this workflow and `next.md` conflict about migration scope, `next.md` wins.
 
+## TheBrain project memory
+
+This project is wired to TheBrain, a global Git-backed vault for durable
+cross-session project memory. `next.md` stays authoritative for migration
+*scope* (objective, donor limits, exclusions); TheBrain is authoritative for
+project *memory* (findings, decisions, dependencies, plans, implementation
+and verification history) so it survives context compaction and new sessions.
+
+At the start of every run, follow this startup contract before other setup:
+
+1. Read `.brain/project.yaml` in this repo root.
+2. Resolve `$THEBRAIN_HOME` (set via shell env; do not hard-code its path here).
+3. Read `$THEBRAIN_HOME/<brain_project>/INDEX.md`.
+4. Read that project's `baton.md`.
+5. Traverse the linked nodes `baton.md` points at (objective, plan, findings,
+   decisions, evidence) before beginning work.
+
+While working, persist durable facts back to TheBrain as they occur — do not
+rely on context compaction or session memory to carry them:
+
+* Discovery → write/update a `finding` node.
+* Dependency → write/update a `dependency` node.
+* A meaningful choice (could have gone another way) → write a `decision` node.
+* A plan changes → update the `plan` node, or supersede it with a new one.
+* Implementation → write an `implementation` node.
+* Tests/runtime checks → write `evidence` and `verification` nodes.
+
+Update `baton.md` when work pauses or hands off, so the next run (Claude or
+Codex) can resume from it. See `$THEBRAIN_HOME/schema/` for node/link format
+and `$THEBRAIN_HOME/AGENTS.md` for the shared client contract.
+
 ## Model routing
 
 ### Haiku
@@ -92,6 +123,11 @@ Using the current objective from `next.md`:
 7. Implement primarily with Sonnet.
 8. Build and test after each meaningful integration unit.
 9. Diagnose and repair failures before moving forward.
+9a. Dispatch `mgba-tester` against the current build continuously throughout an
+    objective, not only once at the end of a section — its job is to actively hunt
+    for bugs, mistakes, and regressions across the whole ROM as it stands, not just
+    smoke-test the one feature just added. Don't wait for a full objective to finish
+    before getting runtime signal.
 10. Compare completed behavior against the permitted donor implementation.
 11. Perform an independent review for:
 
@@ -157,14 +193,21 @@ Keep the loop moving rather than stalling indefinitely on one objective.
 
 **Stuck on a bug**, once `debugger` has already tried and failed to root-cause it:
 
-1. Remove the affected file and reimplement that piece a genuinely different way
-   — not a repeat of the same fix.
-2. If the reimplementation still doesn't resolve it, fall back to the smallest
+1. Escalate to `codex-rescue` for an independent second-opinion diagnosis or
+   implementation pass, deliberately *before* `deep-engineer`. This
+   intentionally overrides the "Model routing" section's Opus-reservation
+   guidance for this one case — `codex-rescue` runs ahead of `deep-engineer`
+   regardless of model tier.
+2. If `codex-rescue` also fails to resolve it, remove the affected file and
+   reimplement that piece a genuinely different way — not a repeat of the same
+   fix. Escalate to `deep-engineer` here if the bug turns out to be
+   architectural rather than a straightforward reimplementation.
+3. If the reimplementation still doesn't resolve it, fall back to the smallest
    patch that makes the build succeed and leaves existing game behavior
    unaffected (stub out or disable just the broken piece). Never leave the tree
    in a state that fails to build, and never ship a "fix" that breaks something
    that worked before.
-3. Either way, note the unresolved bug in `next.md` (same pattern as the existing
+4. Either way, note the unresolved bug in `next.md` (same pattern as the existing
    Catch Mode "unreproduced crash" note) — what it is, what was tried, and why it
    didn't work — so it isn't silently lost.
 
@@ -177,6 +220,7 @@ correctness question):
 3. Note the decision and the open question in `next.md` for later reconsideration.
 
 This doesn't relax the existing escalation paths (`debugger` for bugs,
+`codex-rescue` as the mandatory second opinion before `deep-engineer`,
 `deep-engineer` for real architectural ambiguity) — it's what happens after
 those have already been tried and the loop is still stuck.
 
@@ -209,9 +253,12 @@ the handoff text is an incomplete task, not a completed one:
   comments. May read implementation code to verify what it documents, but
   cannot edit anything itself — see the handoff rule above.
 - **mgba-tester** (Haiku) — emulator operation, screenshots, runtime checks,
-  and regression tests via the `.claude/tests/mgba/` harness. Uses
-  `superpowers:verification-before-completion` before reporting any result.
-  Not for build diagnosis or implementation.
+  and regression tests via the `.claude/tests/mgba/` harness. Runs continuously
+  against the current build throughout an objective, not only once at the end
+  of a section — its job is to proactively hunt for bugs, mistakes, and
+  regressions across the whole ROM as it currently stands, not just verify the
+  one feature just implemented. Uses `superpowers:verification-before-completion`
+  before reporting any result. Not for build diagnosis or implementation.
 - **migration-worker** (Sonnet) — normal migration implementation and
   integration: extracting donor code per `next.md`, adapting it to this
   codebase, wiring hook points. Uses `superpowers:using-git-worktrees` for

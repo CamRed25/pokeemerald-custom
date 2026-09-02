@@ -63,6 +63,23 @@ next up
 - Objectives 16-17 — optional, lower priority than 9-15, not yet triaged.
 - "New candidate features" (donors 5-11, near the bottom of this file) — NOT triaged, NOT
   integration-ordered yet. Do not start any of them before triage.
+- Fishing minigame — triaged 2026-08-31, promoted to Objective 18 (see "Optional content
+  expansions" below). Donor confirmed viable (makiwu/dreamstone-mysteries, Bivurnum's
+  implementation), ~85% incorporation-readiness. Not yet implemented — full findings,
+  dependencies, decision, and a step-by-step integration plan are in TheBrain
+  (`projects/emerald`: objective `fishing-minigame`, plan `fishing-minigame-integration`).
+- Battle Arcade, wild held-item drops, bag-overflow-to-PC — triaged and planned 2026-08-31/
+  2026-09-01, promoted to Objectives 19-21 (see "Optional content expansions" below). All
+  three are pinned, source-verified against the target (not just README/wiki-level), and have
+  step-by-step integration plans in TheBrain. Wild held-item drops and bag-overflow-to-PC have
+  no open blockers; Battle Arcade's one blocker (donor deleted its own maps) has a resolved
+  design decision. None implemented yet.
+- Modernised Battle Frontier opponent-set generation (damon-murdoch/emerald-battle-revolution) —
+  source-verified 2026-09-01, real and compatible, but too large for a direct integration plan
+  (~10-40x the LOC of 18-21, touches every Frontier facility, needs a build-pipeline addition).
+  Recommend `overhaul-planner` scoping before this becomes executable; comparable in scope to
+  Objective 17 below. See TheBrain `objectives/frontier-modern-set-generation`. Not promoted to
+  a numbered objective yet.
 
 ## Donor map (vetted — backs objectives 1-15)
 
@@ -209,6 +226,65 @@ Optional content expansions (later, lower priority than 9-15):
     1.12.0, so expect porting work.
 17. Battle Frontier expansion [Emerald-specific] — worthwhile for substantially more postgame
     content, but much larger in scope than the UI/QoL work above.
+18. Fishing minigame — Triaged 2026-08-31, ~85% incorporation-readiness (comparable to Catch
+    Mode: confirmed donor, clean single-seam integration, zero SaveBlock risk; slightly below
+    12/15a because of the graphics-porting volume and one real design piece in the CB2
+    return-path wiring). Donor: makiwu/dreamstone-mysteries (Bivurnum's implementation),
+    pinned at commit `cea1d477d96832186012633f086f9948f9724ad9`. Ports a bar/score-meter
+    reel-in minigame (treasure spawns, ability-modified difficulty) as a purely additive,
+    config-toggled alternative to the existing vanilla Gen1/2/3 "dots" minigame in
+    `src/fishing.c` — the toggle keeps current behavior as the untouched default. Full triage
+    findings, the target-side integration seam (`src/fishing.c:295` `Fishing_ChangeMinigame`),
+    the additive-toggle decision, and a step-by-step implementation plan live in TheBrain
+    (`projects/emerald`: objective `fishing-minigame`), not duplicated here. Not yet
+    implemented — next step is a `migration-worker` pass on a new `feature/fishing-minigame`
+    branch per that plan.
+19. Battle Arcade — Triaged and planned 2026-08-31/2026-09-01. Donor:
+    PokemonSanFran/pokeemerald (`battle_arcade` branch), pinned at commit
+    `2f1bd52b65a30c34c17ac91a49595680c6efbd61`. Ports a new Battle Frontier facility (7
+    consecutive battles + a random event board) — the module itself
+    (`src/battle_arcade.c`, 2756 lines) is self-contained and its shared-file touch points
+    are cleanly fenced (`// Start battle_arcade` markers), no facility-ID or flag collisions.
+    One real blocker found and resolved: the donor deleted its own three maps (lobby/hallway/
+    battle room) from its branch — resolved by a decision to build 3 new maps modeled on the
+    target's existing `BattleFrontier_BattleDomeLobby`/`Corridor`/`BattleRoom` triad (same
+    tileset, same footprint) rather than new art. Full findings, the map-design decision, and
+    a 7-step implementation plan live in TheBrain (`projects/emerald`: objective
+    `battle-arcade`, plan `battle-arcade-integration`), not duplicated here. Not yet
+    implemented — next step is a `migration-worker` pass on a new `feature/battle-arcade`
+    branch, maps first per that plan.
+20. Wild held-item drops — Triaged and planned 2026-08-31/2026-09-01, no open blockers, the
+    most implementation-ready of 19-21. Donor: resetes12/pokeemerald (Modern Emerald), pinned
+    at commit `22f159fecd06376743343d659b945096bfb183b8` — reference only, since target's own
+    newer battle-script architecture (a dedicated-opcode/`callnative` design, not the donor's
+    `various`-switch style) already carries most of what this needs unused: a
+    `heldItems[]` snapshot field and a `savebattleritem`/`BS_SaveBattlerItem` primitive with
+    zero current call sites. Defeating (not catching) a wild Pokémon awards its held item,
+    hooked into the existing `BattleScript_PayDayMoneyAndPickUpItems::` reward chain between
+    `givepaydaymoney` and `pickup`. The donor's own config toggle is entangled in a large
+    randomizer-menu system it has and target doesn't — needs a plain target-style toggle
+    instead. Full findings and a 7-step implementation plan live in TheBrain
+    (`projects/emerald`: objective `wild-held-item-drops`, plan
+    `wild-held-item-drops-integration`), not duplicated here. Not yet implemented — next step
+    is a `migration-worker` pass on a new `feature/wild-held-item-drops` branch per that plan.
+21. Bag overflow to PC — Triaged and planned 2026-08-31/2026-09-01, no open blockers. Primary
+    source is a pret/pokeemerald wiki patch
+    (`https://github.com/pret/pokeemerald/wiki/Item-Automatically-Goes-to-PC-if-Bag-is-Full`),
+    not voloved/pokeemerald_fork as originally listed in the candidate donor map below —
+    voloved's fork turned out to just be one adopter of this same community patch, discovered
+    while verifying voloved's own source didn't actually contain the claimed behavior
+    (voloved pinned at commit `bbea7dc4128c189abffe5d7b4a4912026bade8af` as a secondary
+    reference). Routes item rewards from 3 scripted item-gain paths
+    (`Std_ObtainItem`/`Std_FindItem`/`EventScript_HiddenItemScript`) to the PC when the Bag is
+    full, excluding key items and Battle Pyramid item-storage mode; confirmed additive-safe
+    against target's existing `VAR_0x8007` TRUE/FALSE script dispatch (adds a third state, not
+    a breaking change) and confirmed zero scope overlap with Objective 20. One research step
+    remains before implementation (the wiki page summarized but didn't quote the exact
+    `src/item.c`/`src/scrcmd.c` diff — step 1 of the plan). Full findings and a 7-step
+    implementation plan live in TheBrain (`projects/emerald`: objective `bag-overflow-to-pc`,
+    plan `bag-overflow-to-pc-integration`), not duplicated here. Not yet implemented — next
+    step is a `migration-worker` pass on a new `feature/bag-overflow-to-pc` branch per that
+    plan.
 
 ## Open bugs / issues — RESOLVED 2026-08-28, Quest Menu checkpointed (commit 24c45661b8)
 
@@ -319,6 +395,16 @@ order to implement, highest first:
    option_plus_menu.c/battle_interface.c in one integration pass, but real standalone work.
    This resolves the untracked "improved move-info panel" item from the donor map above:
    verdict is a SEPARATE objective from Catch Mode, not folded in.
+   Scope-narrowing note (implemented 2026-08-30): the "effectiveness/STAB icon assets" flagged
+   above as unconfirmed do not exist in this donor at all — donor only ever implements type +
+   category icons (`GetMoveTypeIconData`/`GetCatTypeIconData`, src/battle_interface.c:3292-3313),
+   nothing effectiveness/STAB-related. Also, icons were NOT ported as donor's window-blit-into-
+   sprite-window approach; the type icon reuses the target's existing `gMoveTypes_Pal` (byte-
+   identical source file to the donor's), and only the two small uncompressed donor icon strips
+   (`wMoveInfo_Categories.png`, `wMoveInfo_Types.png`) were ported, blitted directly into two
+   BG windows (`B_WIN_MOVE_TYPE` shrunk to 4 tiles + new `B_WIN_MOVE_CATEGORY` appended at enum
+   value 26) using the existing `BlitBitmapToWindow`/window-lifecycle infra already correct for
+   `B_WIN_MOVE_TYPE` — no new sprites, no donor move-info-window-background PNGs ported.
 6. **Objective 13 (Mugshots + dialogue nameplates) — 15%, BLOCKED.** Donor (poketransform) has
    NO usable source code — confirmed via `gh api` against Ddaretrogamer/poketransform: only a
    README, box art PNGs, and a PMD sprite/portrait art-credits file. Cannot be scheduled as a
@@ -393,7 +479,10 @@ an existing one.
 10. pkmnsnfrn/pokeemerald-expansion (older Expansion-derived) and voloved/pokeemerald_fork.
     - Bag sorting (Ghoulslash's implementation, via the pkmnsnfrn fork) — not listed among
       current RHH's standard interface features; confirm it's actually missing before scheduling
-    - Items go to the PC automatically when the Bag is full (voloved fork)
+    - Items go to the PC automatically when the Bag is full — triaged 2026-08-31/2026-09-01,
+      promoted to Objective 21 above, no longer unscheduled. CORRECTION: voloved's fork does
+      NOT actually contain this behavior on source inspection; it's just one adopter of a
+      pret/pokeemerald wiki patch, which is the real donor — see Objective 21.
 
 11. worpbane/pokeemerald-worped — NOTE: distinct from worpbane/pokeemerald-worped-ex already in
     the donor map above (donor 1). Do not conflate the two repos.
@@ -403,7 +492,8 @@ an existing one.
 
 ### Candidate feature list (unscheduled, donor in parentheses)
 
-- Fishing minigame (dreamstone-mysteries)
+- Fishing minigame (dreamstone-mysteries) — triaged 2026-08-31, promoted to Objective 18 above,
+  no longer unscheduled.
 - Mining minigame (dreamstone-mysteries)
 - Battle speed setting (dreamstone-mysteries or FireRed Enhanced — compare both)
 - Dialogue auto-scroll (Expanded-Emerald)
@@ -425,7 +515,9 @@ an existing one.
 - FRLG Help System removal [FRLG-specific, needs independent verification against RHH's FRLG
   memory layout] (FireRed Enhanced)
 - Bag sorting [verify not already present in RHH before scheduling] (pkmnsnfrn/pokeemerald-expansion)
-- Items → PC when Bag is full (voloved/pokeemerald_fork)
+- Items → PC when Bag is full — triaged 2026-08-31/2026-09-01, promoted to Objective 21 above
+  (real donor is a pret/pokeemerald wiki patch, not voloved/pokeemerald_fork — see Objective 21),
+  no longer unscheduled.
 - Seasons [experimental — donor itself reports it's partly nonfunctional] (worpbane/pokeemerald-worped)
 
 Several of these (HP/EXP bar speed, Skip Nickname/Pokédex, autosave-after-heal) are natural fits
