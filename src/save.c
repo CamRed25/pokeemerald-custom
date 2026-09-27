@@ -1,4 +1,5 @@
 #include "global.h"
+#include "autosave.h"
 #include "agb_flash.h"
 #include "gba/flash_internal.h"
 #include "fieldmap.h"
@@ -105,6 +106,12 @@ static u8 sSaveWriteRole = SAVE_GROUP_MANUAL;
 // whichever group holds the save data that should actually be loaded. Used by
 // the sector-read side (CopySaveSlotData, GetSaveBlocksPointersBaseOffset).
 static u8 sSaveReadGroup = SAVE_GROUP_MANUAL;
+static EWRAM_DATA bool8 sSaveOperationInProgress = FALSE;
+
+bool8 Save_IsOperationInProgress(void)
+{
+    return sSaveOperationInProgress;
+}
 
 EWRAM_DATA struct SaveSector gSaveDataBuffer = {0}; // Buffer used for reading/writing sectors
 
@@ -779,6 +786,9 @@ u8 HandleSavingData(u8 saveType)
 {
     u8 i;
     u32 *backupVar = gTrainerHillVBlankCounter;
+    u8 previousWriteRole = sSaveWriteRole;
+
+    sSaveOperationInProgress = TRUE;
 
     gTrainerHillVBlankCounter = NULL;
     UpdateSaveAddresses();
@@ -786,11 +796,7 @@ u8 HandleSavingData(u8 saveType)
     switch (saveType)
     {
     case SAVE_AUTOSAVE:
-        // Snapshot the current party/object state into the fixed autosave
-        // physical group. GetWritePhysicalGroup routes this write there once
-        // the save has migrated; before that (no manual save has migrated
-        // this save yet) it's not safe to claim a role-specific group, so it
-        // falls back to the same legacy alternation a normal save would use.
+        // TrySavingData rejects unmigrated saves before reaching this path.
         CopyPartyAndObjectsToSave();
         WriteSaveSectorOrSlot(FULL_SAVE_SLOT, gRamSaveSectorLocations);
         break;
@@ -849,36 +855,79 @@ u8 HandleSavingData(u8 saveType)
     if (saveType != SAVE_AUTOSAVE && !gDamagedSaveSectors)
         gSaveBlock2Ptr->saveFormatMarker = SAVE_FORMAT_MARKER;
 
+    sSaveWriteRole = previousWriteRole;
     gTrainerHillVBlankCounter = backupVar;
+    sSaveOperationInProgress = FALSE;
     return 0;
 }
 
 u8 TrySavingData(u8 saveType)
 {
-    if (gFlashMemoryPresent != TRUE)
+    u32 previousDamagedSectors = gDamagedSaveSectors;
+    u32 previousLastSaveCounter = gLastSaveCounter;
+    u16 previousLastKnownGoodSector = gLastKnownGoodSector;
+    u16 previousLastWrittenSector = gLastWrittenSector;
+    u8 status;
+
+    if (gFlashMemoryPresent != TRUE || (saveType == SAVE_AUTOSAVE && sSaveOperationInProgress))
     {
         gSaveAttemptStatus = SAVE_STATUS_ERROR;
         return SAVE_STATUS_ERROR;
     }
 
-    HandleSavingData(saveType);
-    if (!gDamagedSaveSectors)
+    if (saveType == SAVE_AUTOSAVE)
     {
-        gSaveAttemptStatus = SAVE_STATUS_OK;
-        return SAVE_STATUS_OK;
+        u32 counter;
+        gReadWriteSector = &gSaveDataBuffer;
+        UpdateSaveAddresses();
+        // Legacy group 1 may still hold the player's manual checkpoint, even
+        // after migration set the marker in RAM. Wait for a fixed manual save.
+        if (gSaveBlock2Ptr->saveFormatMarker != SAVE_FORMAT_MARKER
+         || (!GroupHasFormatMarker(SAVE_GROUP_MANUAL)
+          && !GroupHasFormatMarker(SAVE_GROUP_AUTOSAVE)
+          && GetSaveGroupStatus(SAVE_GROUP_AUTOSAVE, gRamSaveSectorLocations, &counter) != SAVE_STATUS_EMPTY))
+        {
+            gSaveAttemptStatus = SAVE_STATUS_ERROR;
+            return SAVE_STATUS_ERROR;
+        }
+        gDamagedSaveSectors = 0;
     }
-    else
+
+    HandleSavingData(saveType);
+    status = gDamagedSaveSectors ? SAVE_STATUS_ERROR : SAVE_STATUS_OK;
+    if (saveType == SAVE_AUTOSAVE)
+    {
+        if (status == SAVE_STATUS_ERROR)
+        {
+            u16 sector;
+            // A partial replacement is not a recoverable snapshot. Only the
+            // autosave group is invalidated; the manual checkpoint is intact.
+            for (sector = NUM_SECTORS_PER_SLOT; sector < 2 * NUM_SECTORS_PER_SLOT; sector++)
+                EraseFlashSector(sector);
+        }
+        // Preserve the manual group's rotation for later partial/link saves.
+        // gSaveCounter is the live sequence number: the full-slot writer keeps
+        // its increment on success and rolls it back on failure.
+        gLastWrittenSector = previousLastWrittenSector;
+        // Autosave errors must not poison a later manual or incremental save.
+        gDamagedSaveSectors = previousDamagedSectors;
+        // gLastSaveCounter is only a rollback backup, not the live counter.
+        gLastSaveCounter = previousLastSaveCounter;
+        gLastKnownGoodSector = previousLastKnownGoodSector;
+    }
+    else if (status == SAVE_STATUS_ERROR)
     {
         DoSaveFailedScreen(saveType);
-        gSaveAttemptStatus = SAVE_STATUS_ERROR;
-        return SAVE_STATUS_ERROR;
     }
+    gSaveAttemptStatus = status;
+    return status;
 }
 
 bool8 LinkFullSave_Init(void)
 {
     if (gFlashMemoryPresent != TRUE)
         return TRUE;
+    sSaveOperationInProgress = TRUE;
     UpdateSaveAddresses();
     sSaveWriteRole = SAVE_GROUP_MANUAL; // Link full save is a manual-role write
     CopyPartyAndObjectsToSave();
@@ -914,6 +963,7 @@ bool8 LinkFullSave_SetLastSectorSignature(void)
     CopySectorSignatureByte(NUM_SECTORS_PER_SLOT, gRamSaveSectorLocations);
     if (gDamagedSaveSectors)
         DoSaveFailedScreen(SAVE_NORMAL);
+    sSaveOperationInProgress = FALSE;
     return FALSE;
 }
 
@@ -922,6 +972,7 @@ bool8 WriteSaveBlock2(void)
     if (gFlashMemoryPresent != TRUE)
         return TRUE;
 
+    sSaveOperationInProgress = TRUE;
     UpdateSaveAddresses();
     sSaveWriteRole = SAVE_GROUP_MANUAL; // Used for link saves; always manual-role
     CopyPartyAndObjectsToSave();
@@ -958,6 +1009,8 @@ bool8 WriteSaveBlock1Sector(void)
     if (gDamagedSaveSectors)
         DoSaveFailedScreen(SAVE_LINK);
 
+    if (finished)
+        sSaveOperationInProgress = FALSE;
     return finished;
 }
 

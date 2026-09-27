@@ -1,4 +1,5 @@
 #include "global.h"
+#include "autosave.h"
 #include "battle_pyramid.h"
 #include "bg.h"
 #include "constants/songs.h"
@@ -48,6 +49,11 @@ static bool8 BattlePyramidRetireReturnCallback(void);
 EWRAM_DATA static u8 (*sSaveDialogCallback)(void) = NULL;
 EWRAM_DATA static u8 sSaveDialogTimer = 0;
 EWRAM_DATA static u8 sSaveInfoWindowId = 0;
+
+bool8 SaveDialog_IsActive(void)
+{
+    return sSaveDialogCallback != NULL;
+}
 
 static const struct BgTemplate sBgTemplates_LinkBattleSave[] =
     {
@@ -388,6 +394,7 @@ void Task_SaveDialogHandleSave(u8 taskId)
             ClearDialogWindowAndFrameToTransparent(0, TRUE);
             ScriptUnfreezeObjectEvents();
             UnlockPlayerFieldControls();
+            sSaveDialogCallback = NULL;
             DestroyTask(taskId);
             break;
         case USM_SAVE_ERROR:  // Close start menu
@@ -395,6 +402,7 @@ void Task_SaveDialogHandleSave(u8 taskId)
             ScriptUnfreezeObjectEvents();
             UnlockPlayerFieldControls();
             SoftResetInBattlePyramid();
+            sSaveDialogCallback = NULL;
             DestroyTask(taskId);
             break;
     }
@@ -409,6 +417,7 @@ void Task_SaveDialogHandleBattlePyramidRetire(u8 taskId)
         ScriptUnfreezeObjectEvents();
         UnlockPlayerFieldControls();
         gMenuCallback = BattlePyramidRetireReturnCallback;
+        sSaveDialogCallback = NULL;
         DestroyTask(taskId);
         break;
     case USM_SAVE_IN_PROGRESS:
@@ -418,6 +427,7 @@ void Task_SaveDialogHandleBattlePyramidRetire(u8 taskId)
         ScriptUnfreezeObjectEvents();
         UnlockPlayerFieldControls();
         ScriptContext_SetupScript(BattlePyramid_Retire);
+        sSaveDialogCallback = NULL;
         DestroyTask(taskId);
         break;
     }

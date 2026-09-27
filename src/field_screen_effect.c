@@ -1,4 +1,5 @@
 #include "global.h"
+#include "autosave.h"
 #include "cable_club.h"
 #include "event_data.h"
 #include "fieldmap.h"
@@ -718,6 +719,7 @@ void Task_WarpAndLoadMap(u8 taskId)
     case 2:
         WarpIntoMap();
         SetMainCallback2(CB2_LoadMap);
+        Autosave_Request();
         DestroyTask(taskId);
         break;
     }

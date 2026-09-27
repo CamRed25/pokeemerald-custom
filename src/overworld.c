@@ -1,5 +1,6 @@
 #include "global.h"
 #include "overworld.h"
+#include "autosave.h"
 #include "battle_pyramid.h"
 #include "battle_setup.h"
 #include "battle_util.h"
@@ -1885,6 +1886,7 @@ void CB2_Overworld(void)
         SetFieldVBlankCallback();
         return;
     }
+    Autosave_Update();
 }
 
 void SetMainCallback1(MainCallback cb)
@@ -1992,6 +1994,7 @@ static void CB2_LoadMap2(void)
     SetFieldVBlankCallback();
     SetMainCallback1(CB1_Overworld);
     SetMainCallback2(CB2_Overworld);
+    Autosave_OnMapLoadComplete();
 }
 
 void CB2_ReturnToFieldContestHall(void)
@@ -2008,6 +2011,7 @@ void CB2_ReturnToFieldContestHall(void)
         SetFieldVBlankCallback();
         SetMainCallback1(CB1_Overworld);
         SetMainCallback2(CB2_Overworld);
+        Autosave_OnMapLoadComplete();
     }
 }
 
